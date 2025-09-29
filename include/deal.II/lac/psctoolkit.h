@@ -147,6 +147,9 @@ namespace PSCToolkit
     size_type
     n_nonzero_elements() const;
 
+    value_type
+    el(const size_type i, const size_type j) const;
+
     /**
      * Set the element (i,j) to 'value'.
      */
@@ -201,9 +204,24 @@ namespace PSCToolkit
 
 
   private:
-    psb_c_dspmat     *psblas_sparse_matrix;
+    /**
+     * Get the underlying PSBLAS sparse matrix.
+     */
+    psb_c_dspmat *
+    get_psblas_matrix() const;
+
+    /**
+     * Get the underlying PSBLAS descriptor.
+     */
+    psb_c_descriptor *
+    get_psblas_descriptor() const;
+
+
+    psb_c_dspmat *psblas_sparse_matrix;
+
     psb_c_descriptor *psblas_descriptor;
-    psb_c_ctxt       *psblas_context;
+
+    psb_c_ctxt *psblas_context;
   };
 
 

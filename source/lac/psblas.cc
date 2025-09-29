@@ -327,6 +327,31 @@ namespace PSCToolkit
 
 
 
+  PSCToolkit::SparseMatrix::value_type
+  PSCToolkit::SparseMatrix::el(const PSCToolkit::SparseMatrix::size_type,
+                               const PSCToolkit::SparseMatrix::size_type) const
+  {
+    AssertThrow(false, ExcNotImplemented());
+  }
+
+
+
+  psb_c_dspmat *
+  PSCToolkit::SparseMatrix::get_psblas_matrix() const
+  {
+    return psblas_sparse_matrix;
+  }
+
+
+
+  psb_c_descriptor *
+  PSCToolkit::SparseMatrix::get_psblas_descriptor() const
+  {
+    return psblas_descriptor;
+  }
+
+
+
   void
   PSCToolkit::SparseMatrix::set(
     const std::vector<PSCToolkit::SparseMatrix::size_type> &indices,
