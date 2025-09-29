@@ -40,6 +40,7 @@
 #include <deal.II/lac/petsc_block_vector.h>
 #include <deal.II/lac/petsc_sparse_matrix.h>
 #include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/psctoolkit.h>
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/sparse_matrix_ez.h>
 #include <deal.II/lac/sparsity_pattern.h>

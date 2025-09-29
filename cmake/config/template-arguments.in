@@ -218,6 +218,9 @@ AFFINE_CONSTRAINTS_MATRIX_TEMPL := { FullMatrix;
                                      ChunkSparseMatrix;
                                    }
 
+// Special lists for AffineConstraints:
+AFFINE_CONSTRAINTS_PSC := {PSCToolkit::SparseMatrix}
+
 // General container types
 GENERAL_CONTAINER_TYPES := { std::vector;
                              ArrayView
