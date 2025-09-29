@@ -17,8 +17,12 @@
 
 #include <deal.II/base/config.h>
 
+#include "deal.II/base/index_set.h"
+
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/vector.h>
+
+#include <cstddef>
 
 #ifdef DEAL_II_WITH_PSBLAS
 
@@ -101,6 +105,107 @@ namespace PSCToolkit
     int
     DescriptorFree(psb_c_descriptor *cd);
   } // namespace Communicator
+
+
+
+  class SparseMatrix : public EnableObserverPointer
+  {
+  public:
+    /**
+     * Type for container size.
+     */
+    using size_type = dealii::types::global_dof_index;
+
+    /**
+     * Type for container values.
+     */
+    using value_type = double;
+
+    /**
+     *Default constructor. Generates an empty (zero-size) matrix.
+     */
+    SparseMatrix();
+
+    /**
+     */
+    ~SparseMatrix();
+
+    /**
+     *
+     *
+     */
+    void
+    reinit(const IndexSet &parallel_partitioning,
+           const MPI_Comm  communicator = MPI_COMM_SELF);
+
+    size_type
+    m() const;
+
+    size_type
+    n() const;
+
+    size_type
+    n_nonzero_elements() const;
+
+    /**
+     * Set the element (i,j) to 'value'.
+     */
+    void
+    set(const size_type i, const size_type j, const value_type value);
+
+    void
+    set(const std::vector<size_type> &indices,
+        const FullMatrix<double>     &matrix);
+
+    /**
+     * Add value 'value' to the element (i,j).
+     */
+    void
+    add(const size_type i, const size_type j, const value_type value);
+
+    /**
+     * TODO (to conform with interface?)
+     */
+    void
+    add(const std::vector<size_type> &indices,
+        const FullMatrix<value_type> &full_matrix,
+        const bool = false);
+
+    void
+    add(const size_type                row,
+        const std::vector<size_type>  &col_indices,
+        const std::vector<value_type> &values,
+        const bool = false);
+
+    void
+    add(const size_type               row,
+        const size_type               ncols,
+        const std::vector<size_type> &col_indices,
+        const value_type             *values,
+        const bool = false,
+        const bool = false);
+
+
+    void
+    add(const size_type   row,
+        const size_type   n_cols,
+        const size_type  *col_indices,
+        const value_type *values,
+        const bool        elide_zero_values      = true,
+        const bool        col_indices_are_sorted = false);
+
+
+    void
+    compress();
+
+
+
+  private:
+    psb_c_dspmat     *psblas_sparse_matrix;
+    psb_c_descriptor *psblas_descriptor;
+    psb_c_ctxt       *psblas_context;
+  };
+
 
   /**
    * Namespace for PSBLAS matrix functions.
