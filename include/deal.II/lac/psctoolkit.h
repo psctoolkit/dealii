@@ -18,9 +18,13 @@
 #include <deal.II/base/config.h>
 
 #include "deal.II/base/index_set.h"
+#include <deal.II/base/array_view.h>
 
 #include <deal.II/lac/full_matrix.h>
+#include <deal.II/lac/sparsity_pattern_base.h>
 #include <deal.II/lac/vector.h>
+
+#include <memory.h>
 
 #include <cstddef>
 
@@ -107,6 +111,86 @@ namespace PSCToolkit
   } // namespace Communicator
 
 
+  /**
+   * This class implements a sparsity pattern based on PSBLAS framework.
+   */
+  class SparsityPattern : public SparsityPatternBase
+  {
+  public:
+    using size_type = dealii::types::global_dof_index;
+
+    /**
+     * Default constructor.
+     */
+    SparsityPattern();
+
+    /**
+     * Constructor from an existing PSBLAS sparsity pattern.
+     */
+    SparsityPattern(const IndexSet &parallel_partitioning,
+                    const MPI_Comm  communicator = MPI_COMM_SELF);
+
+    /**
+     * Destructor.
+     */
+    virtual ~SparsityPattern() override = default;
+
+    /**
+     * Add several elements in one row to the sparsity pattern.
+     */
+    template <typename ForwardIterator>
+    void
+    add_entries(const size_type row,
+                ForwardIterator begin,
+                ForwardIterator end,
+                const bool      indices_are_sorted = false);
+
+    virtual void
+    add_row_entries(const size_type                  &row,
+                    const ArrayView<const size_type> &columns,
+                    const bool indices_are_sorted = false) override;
+
+    void
+    add(const size_type i, const size_type j);
+
+    using SparsityPatternBase::add_entries;
+
+  private:
+    std::shared_ptr<psb_c_descriptor> psblas_descriptor;
+
+    psb_c_ctxt *psblas_context;
+
+    friend class SparseMatrix;
+  };
+
+
+
+  template <typename ForwardIterator>
+  inline void
+  SparsityPattern::add_entries(const PSCToolkit::SparsityPattern::size_type row,
+                               ForwardIterator begin,
+                               ForwardIterator end,
+                               const bool      indices_are_sorted)
+  {
+    if (begin == end)
+      return;
+
+    (void)indices_are_sorted;
+    psb_i_t  nz = static_cast<int>(end - begin);
+    psb_l_t *ia = (psb_l_t *)malloc(nz * sizeof(psb_l_t));
+    psb_l_t *ja = (psb_l_t *)malloc(nz * sizeof(psb_l_t));
+
+    for (int k = 0; k < nz; ++k)
+      {
+        ia[k] = row;          // row index
+        ja[k] = *(begin + k); // column index
+      }
+    int err = psb_c_cdins(nz, ia, ja, psblas_descriptor.get());
+    Assert(err == 0,
+           ExcMessage("Error inserting entries into PSBLAS descriptor."));
+  }
+
+
 
   class SparseMatrix : public EnableObserverPointer
   {
@@ -127,12 +211,20 @@ namespace PSCToolkit
     SparseMatrix();
 
     /**
+     * Generate a matrix from a PSBLAS SparsityPattern.
+     */
+    SparseMatrix(const SparsityPattern &psblas_sparsity_pattern,
+                 const MPI_Comm         communicator = MPI_COMM_SELF);
+
+    /**
+     * Destructor. Internally, its frees the PSBLAS sparse matrix and
+     * descriptor.
      */
     ~SparseMatrix();
 
     /**
-     *
-     *
+     * Construtor using an IndexSet and a MPI communicator to describe the
+     * parallel partitioning of the matrix.
      */
     void
     reinit(const IndexSet &parallel_partitioning,
@@ -143,6 +235,9 @@ namespace PSCToolkit
 
     size_type
     n() const;
+
+    size_type
+    local_size() const;
 
     size_type
     n_nonzero_elements() const;
@@ -202,6 +297,14 @@ namespace PSCToolkit
     compress();
 
 
+    // TODO: mat-vec products
+    // void
+    // vmult(Vector &dst, const Vector &src) const;
+
+    // void
+    // Tvmult(Vector &dst, const Vector &src) const;
+
+
 
   private:
     /**
@@ -219,7 +322,7 @@ namespace PSCToolkit
 
     psb_c_dspmat *psblas_sparse_matrix;
 
-    psb_c_descriptor *psblas_descriptor;
+    std::shared_ptr<psb_c_descriptor> psblas_descriptor;
 
     psb_c_ctxt *psblas_context;
   };
