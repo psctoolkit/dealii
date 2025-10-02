@@ -12,8 +12,8 @@
 //
 // ------------------------------------------------------------------------
 
-#ifndef dealii_psctoolkit_h
-#define dealii_psctoolkit_h
+#ifndef dealii_psblas_matrix_h
+#define dealii_psblas_matrix_h
 
 #include <deal.II/base/config.h>
 
