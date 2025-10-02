@@ -1800,7 +1800,6 @@ namespace TrilinosWrappers
     inline Vector::size_type
     Vector::size() const
     {
-      std::cout << "Calling trilinos's size function..." << std::endl;
 #    ifndef DEAL_II_WITH_64BIT_INDICES
       return vector->Map().MaxAllGID() + 1 - vector->Map().MinAllGID();
 #    else
