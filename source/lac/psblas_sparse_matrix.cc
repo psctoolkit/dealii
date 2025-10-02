@@ -334,14 +334,14 @@ namespace PSCToolkit
   SparseMatrix::compress()
   {
     // Finalize descriptor...
-    // int err = psb_c_cdasb(psblas_descriptor.get());
-    // Assert(err == 0, ExcMessage("Error while compressing the matrix."));
+    int err = psb_c_cdasb(psblas_descriptor.get());
+    Assert(err == 0, ExcMessage("Error while compressing the matrix."));
 
     // Check if the sparse matrix is not already assembled
     if (!psb_c_dis_matasb(psblas_sparse_matrix, psblas_descriptor.get()))
       {
         // ... and the sparse matrix
-        int err = psb_c_dspasb(psblas_sparse_matrix, psblas_descriptor.get());
+        err = psb_c_dspasb(psblas_sparse_matrix, psblas_descriptor.get());
         Assert(err == 0,
                ExcMessage("Error while assembling the PSBLAS sparse matrix."));
       }

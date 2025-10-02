@@ -15,6 +15,7 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
 
+#include <deal.II/lac/psblas_sparse_matrix.h>
 #include <deal.II/lac/psctoolkit.h>
 
 #include <deal.II/meshworker/mesh_loop.h>
@@ -31,10 +32,8 @@ main(int argc, char **argv)
 {
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
   MPI_Comm                         mpi_communicator = MPI_COMM_WORLD;
-  // Initialize PSBLAS communicator
-  int         iam, nproc, info;
-  psb_c_ctxt *cctxt = PSCToolkit::Communicator::InitFromMPI(mpi_communicator);
-  PSCToolkit::Communicator::Info(cctxt, &iam, &nproc);
+  const unsigned int nproc = Utilities::MPI::n_mpi_processes(mpi_communicator);
+  const int          iam   = Utilities::MPI::this_mpi_process(mpi_communicator);
 
   std::string   ofname = "output_" + std::to_string(iam);
   std::ofstream output(ofname);
@@ -112,8 +111,8 @@ main(int argc, char **argv)
 
 
   output << "Process " << iam << " of  " << nproc
-         << " I have assembled a matrix of  " << psblas_matrix.m() << " x "
-         << psblas_matrix.n() << " size with "
+         << " I have assembled a matrix of  " << psblas_matrix.local_size()
+         << " x " << psblas_matrix.local_size() << " size with "
          << psblas_matrix.n_nonzero_elements() << " non-zero entries."
          << " The locally owned dofs are: " << locally_owned_dofs.n_elements()
          << " and the locally relevant dofs are: "

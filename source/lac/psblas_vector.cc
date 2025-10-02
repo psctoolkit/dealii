@@ -217,10 +217,10 @@ namespace PSCToolkit
     Assert(psblas_vector != nullptr && psblas_descriptor.get() != nullptr,
            ExcMessage("PSBLAS vector or descriptor is null."));
 
-    // int err = psb_c_cdasb(psblas_descriptor.get());
-    // Assert(err == 0, ExcMessage("Error while finalizing descriptor."));
+    int err = psb_c_cdasb(psblas_descriptor.get());
+    Assert(err == 0, ExcMessage("Error while finalizing descriptor."));
 
-    int err = psb_c_dgeasb(psblas_vector, psblas_descriptor.get());
+    err = psb_c_dgeasb(psblas_vector, psblas_descriptor.get());
     Assert(err == 0, ExcMessage("Error compressing PSBLAS vector."));
   }
 
