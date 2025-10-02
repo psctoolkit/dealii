@@ -17,6 +17,7 @@
 
 #include <deal.II/base/config.h>
 
+#include "deal.II/base/enable_observer_pointer.h"
 #include "deal.II/base/index_set.h"
 #include <deal.II/base/array_view.h>
 
@@ -111,222 +112,6 @@ namespace PSCToolkit
   } // namespace Communicator
 
 
-  /**
-   * This class implements a sparsity pattern based on PSBLAS framework.
-   */
-  class SparsityPattern : public SparsityPatternBase
-  {
-  public:
-    using size_type = dealii::types::global_dof_index;
-
-    /**
-     * Default constructor.
-     */
-    SparsityPattern();
-
-    /**
-     * Constructor from an existing PSBLAS sparsity pattern.
-     */
-    SparsityPattern(const IndexSet &parallel_partitioning,
-                    const MPI_Comm  communicator = MPI_COMM_SELF);
-
-    /**
-     * Destructor.
-     */
-    virtual ~SparsityPattern() override = default;
-
-    /**
-     * Add several elements in one row to the sparsity pattern.
-     */
-    template <typename ForwardIterator>
-    void
-    add_entries(const size_type row,
-                ForwardIterator begin,
-                ForwardIterator end,
-                const bool      indices_are_sorted = false);
-
-    virtual void
-    add_row_entries(const size_type                  &row,
-                    const ArrayView<const size_type> &columns,
-                    const bool indices_are_sorted = false) override;
-
-    void
-    add(const size_type i, const size_type j);
-
-    using SparsityPatternBase::add_entries;
-
-  private:
-    std::shared_ptr<psb_c_descriptor> psblas_descriptor;
-
-    psb_c_ctxt *psblas_context;
-
-    friend class SparseMatrix;
-  };
-
-
-
-  template <typename ForwardIterator>
-  inline void
-  SparsityPattern::add_entries(const PSCToolkit::SparsityPattern::size_type row,
-                               ForwardIterator begin,
-                               ForwardIterator end,
-                               const bool      indices_are_sorted)
-  {
-    if (begin == end)
-      return;
-
-    (void)indices_are_sorted;
-    psb_i_t  nz = static_cast<int>(end - begin);
-    psb_l_t *ia = (psb_l_t *)malloc(nz * sizeof(psb_l_t));
-    psb_l_t *ja = (psb_l_t *)malloc(nz * sizeof(psb_l_t));
-
-    for (int k = 0; k < nz; ++k)
-      {
-        ia[k] = row;          // row index
-        ja[k] = *(begin + k); // column index
-      }
-    int err = psb_c_cdins(nz, ia, ja, psblas_descriptor.get());
-    Assert(err == 0,
-           ExcMessage("Error inserting entries into PSBLAS descriptor."));
-  }
-
-
-
-  class SparseMatrix : public EnableObserverPointer
-  {
-  public:
-    /**
-     * Type for container size.
-     */
-    using size_type = dealii::types::global_dof_index;
-
-    /**
-     * Type for container values.
-     */
-    using value_type = double;
-
-    /**
-     *Default constructor. Generates an empty (zero-size) matrix.
-     */
-    SparseMatrix();
-
-    /**
-     * Generate a matrix from a PSBLAS SparsityPattern.
-     */
-    SparseMatrix(const SparsityPattern &psblas_sparsity_pattern,
-                 const MPI_Comm         communicator = MPI_COMM_SELF);
-
-    /**
-     * Destructor. Internally, its frees the PSBLAS sparse matrix and
-     * descriptor.
-     */
-    ~SparseMatrix();
-
-    /**
-     * Construtor using an IndexSet and a MPI communicator to describe the
-     * parallel partitioning of the matrix.
-     */
-    void
-    reinit(const IndexSet &parallel_partitioning,
-           const MPI_Comm  communicator = MPI_COMM_SELF);
-
-    size_type
-    m() const;
-
-    size_type
-    n() const;
-
-    size_type
-    local_size() const;
-
-    size_type
-    n_nonzero_elements() const;
-
-    value_type
-    el(const size_type i, const size_type j) const;
-
-    /**
-     * Set the element (i,j) to 'value'.
-     */
-    void
-    set(const size_type i, const size_type j, const value_type value);
-
-    void
-    set(const std::vector<size_type> &indices,
-        const FullMatrix<double>     &matrix);
-
-    /**
-     * Add value 'value' to the element (i,j).
-     */
-    void
-    add(const size_type i, const size_type j, const value_type value);
-
-    /**
-     * TODO (to conform with interface?)
-     */
-    void
-    add(const std::vector<size_type> &indices,
-        const FullMatrix<value_type> &full_matrix,
-        const bool = false);
-
-    void
-    add(const size_type                row,
-        const std::vector<size_type>  &col_indices,
-        const std::vector<value_type> &values,
-        const bool = false);
-
-    void
-    add(const size_type               row,
-        const size_type               ncols,
-        const std::vector<size_type> &col_indices,
-        const value_type             *values,
-        const bool = false,
-        const bool = false);
-
-
-    void
-    add(const size_type   row,
-        const size_type   n_cols,
-        const size_type  *col_indices,
-        const value_type *values,
-        const bool        elide_zero_values      = true,
-        const bool        col_indices_are_sorted = false);
-
-
-    void
-    compress();
-
-
-    // TODO: mat-vec products
-    // void
-    // vmult(Vector &dst, const Vector &src) const;
-
-    // void
-    // Tvmult(Vector &dst, const Vector &src) const;
-
-
-
-  private:
-    /**
-     * Get the underlying PSBLAS sparse matrix.
-     */
-    psb_c_dspmat *
-    get_psblas_matrix() const;
-
-    /**
-     * Get the underlying PSBLAS descriptor.
-     */
-    psb_c_descriptor *
-    get_psblas_descriptor() const;
-
-
-    psb_c_dspmat *psblas_sparse_matrix;
-
-    std::shared_ptr<psb_c_descriptor> psblas_descriptor;
-
-    psb_c_ctxt *psblas_context;
-  };
-
 
   /**
    * Namespace for PSBLAS matrix functions.
@@ -389,7 +174,7 @@ namespace PSCToolkit
     distribute_local_to_global(
       const std::vector<types::global_dof_index> &local_dof_indices,
       const FullMatrix<double>                   &cell_matrix,
-      const Vector<double>                       &cell_rhs,
+      const dealii::Vector<double>               &cell_rhs,
       psb_c_dspmat                               *mh,
       psb_c_dvector                              *vec,
       psb_c_descriptor                           *cdh);
@@ -433,7 +218,7 @@ namespace PSCToolkit
     void
     distribute_local_to_global(
       const std::vector<types::global_dof_index> &local_dof_indices,
-      const Vector<double>                       &cell_rhs,
+      const dealii::Vector<double>               &cell_rhs,
       psb_c_dvector                              *vec,
       psb_c_descriptor                           *cdh);
     /**

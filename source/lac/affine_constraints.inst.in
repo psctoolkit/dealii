@@ -126,6 +126,16 @@ for (S : REAL_AND_COMPLEX_SCALARS; M : AFFINE_CONSTRAINTS_MATRIX_TEMPL)
 for (M : AFFINE_CONSTRAINTS_PSC)
   {
     template void
+    AffineConstraints<double>::distribute_local_to_global<M, PSCToolkit::Vector>(
+      const FullMatrix<double> &,
+      const Vector<double> &,
+      const std::vector<AffineConstraints<double>::size_type> &,
+      M &,
+      PSCToolkit::Vector &,
+      bool,
+      std::bool_constant<false>) const;
+
+    template void
     AffineConstraints<double>::distribute_local_to_global<M, Vector<double>>(
       const FullMatrix<double> &,
       const Vector<double> &,

@@ -180,6 +180,9 @@ if(DEAL_II_WITH_PSBLAS)
   set(_unity_include_src
     ${_unity_include_src}
     psblas.cc
+    psblas_sparsity.cc
+    psblas_vector.cc
+    psblas_sparse_matrix.cc
   )
 endif()
 
