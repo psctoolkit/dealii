@@ -24,6 +24,10 @@
 #ifdef DEAL_II_WITH_PSBLAS
 #  include <deal.II/lac/psblas_vector.h>
 
+#  include <psb_c_base.h>
+#  include <psb_c_dbase.h>
+
+
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -103,7 +107,7 @@ namespace PSCToolkit
 
 
   MPI_Comm
-  PSCToolkit::Vector::get_mpi_communicator() const
+  Vector::get_mpi_communicator() const
   {
     return communicator;
   }
@@ -111,22 +115,46 @@ namespace PSCToolkit
 
 
   psb_c_descriptor *
-  PSCToolkit::Vector::get_psblas_descriptor() const
+  Vector::get_psblas_descriptor() const
   {
     return psblas_descriptor.get();
   }
 
 
-  // PSCToolkit::Vector::size_type
-  // Vector::size() const
-  // {
-  //   return Utilities::MPI::sum(psb_c_dvect_get_nrows(psblas_vector),
-  //                              communicator);
-  // }
+  void
+  Vector::clear()
+  {
+    // Reset the vector
+    psblas_vector = nullptr;
+    owned_elements.clear();
+    owned_elements.set_size(0);
+  }
+
+
+  double
+  Vector::linfty_norm() const
+  {
+    return psb_c_dgenrmi(psblas_vector, psblas_descriptor.get());
+  }
 
 
 
-  PSCToolkit::Vector::size_type
+  double
+  Vector::l1_norm() const
+  {
+    return psb_c_dgeasum(psblas_vector, psblas_descriptor.get());
+  }
+
+
+  double
+  Vector::l2_norm() const
+  {
+    return psb_c_dgenrm2(psblas_vector, psblas_descriptor.get());
+  }
+
+
+
+  Vector::size_type
   Vector::local_size() const
   {
     return psb_c_dvect_get_nrows(psblas_vector);
@@ -135,8 +163,8 @@ namespace PSCToolkit
 
 
   void
-  Vector::set(const std::vector<PSCToolkit::Vector::size_type>  &indices,
-              const std::vector<PSCToolkit::Vector::value_type> &values)
+  Vector::set(const std::vector<Vector::size_type>  &indices,
+              const std::vector<Vector::value_type> &values)
   {
     Assert(psblas_vector != nullptr && psblas_descriptor.get() != nullptr,
            ExcMessage("PSBLAS vector or descriptor is null."));
@@ -166,8 +194,8 @@ namespace PSCToolkit
   }
 
   void
-  Vector::add(const std::vector<PSCToolkit::Vector::size_type>  &indices,
-              const std::vector<PSCToolkit::Vector::value_type> &values)
+  Vector::add(const std::vector<Vector::size_type>  &indices,
+              const std::vector<Vector::value_type> &values)
   {
     Assert(psblas_vector != nullptr && psblas_descriptor.get() != nullptr,
            ExcMessage("PSBLAS vector or descriptor is null."));
@@ -196,14 +224,14 @@ namespace PSCToolkit
 
 
 
-  PSCToolkit::Vector::value_type
-  Vector::operator()(const PSCToolkit::Vector::size_type index) const
+  Vector::value_type
+  Vector::operator()(const Vector::size_type index) const
   {
     // TODO: check index in range.
     return psb_c_dgetelem(psblas_vector, index, psblas_descriptor.get());
   }
 
-  PSCToolkit::Vector::VectorReference
+  Vector::VectorReference
   Vector::operator()(const size_type index)
   {
     // TODO: check index in range.

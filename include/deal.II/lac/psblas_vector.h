@@ -28,9 +28,6 @@
 
 #  include <deal.II/lac/psctoolkit.h>
 
-#  include <psb_c_base.h>
-#  include <psb_c_dbase.h>
-
 DEAL_II_NAMESPACE_OPEN
 
 namespace PSCToolkit
@@ -195,14 +192,23 @@ namespace PSCToolkit
     MPI_Comm
     get_mpi_communicator() const;
 
-    void
-    clear();
-
     /**
      * Get the underlying PSBLAS descriptor.
      */
     psb_c_descriptor *
     get_psblas_descriptor() const;
+
+    void
+    clear();
+
+    double
+    linfty_norm() const;
+
+    double
+    l1_norm() const;
+
+    double
+    l2_norm() const;
 
   private:
     /*
