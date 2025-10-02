@@ -66,7 +66,7 @@ namespace PSCToolkit
 
     Assert(communicator != MPI_COMM_NULL,
            ExcMessage("MPI_COMM_NULL passed to Vector::reinit()."));
-    communicator = communicator;
+    communicator = comm;
     // Convert MPI_Comm to Fortran-style communicator
     MPI_Fint f_comm = MPI_Comm_c2f(comm);
     psblas_context  = psb_c_new_ctxt();
