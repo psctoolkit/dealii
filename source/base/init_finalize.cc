@@ -161,6 +161,17 @@ InitFinalize::InitFinalize([[maybe_unused]] int    &argc,
     }
 #endif
 
+    // Initialize PSBLAS
+#ifdef DEAL_II_WITH_PSBLAS
+  if (static_cast<bool>(libraries & InitializeLibrary::PSBLAS))
+    {
+      std::cout << "Initializing PSBLAS..." << std::endl;
+      cctxt = psb_c_new_ctxt();
+      psb_c_init(cctxt);
+      psb_c_set_index_base(0); // Set index base to 0
+    }
+#endif
+
   constructor_has_already_run = true;
 
 
@@ -406,6 +417,13 @@ InitFinalize::finalize()
         sc_finalize();
 #endif
 
+#ifdef DEAL_II_WITH_PSBLAS
+      if (static_cast<bool>(libraries & InitializeLibrary::PSBLAS))
+        {
+          psb_c_exit(*cctxt);
+          free(cctxt);
+        }
+#endif
 
       // Finalize Kokkos
       if (static_cast<bool>(libraries & InitializeLibrary::Kokkos))
