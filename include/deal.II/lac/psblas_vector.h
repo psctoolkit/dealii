@@ -152,6 +152,10 @@ namespace PSCToolkit
     reinit(const IndexSet &local_partitioning,
            const MPI_Comm  communicator = MPI_COMM_WORLD);
 
+    /**
+     * Return the global size of the vector, i.e. the sum of the local sizes
+     * over all MPI processes.
+     */
     size_type
     size() const;
 
@@ -183,8 +187,17 @@ namespace PSCToolkit
     VectorReference
     operator()(const size_type index);
 
+    /**
+     * Returns whether or not the vector has ghost elements.
+     */
     bool
     has_ghost_elements() const;
+
+    /**
+     * Gathers the values of the ghost elements.
+     */
+    void
+    update_ghost_values() const;
 
     void
     compress();
@@ -197,6 +210,12 @@ namespace PSCToolkit
      */
     psb_c_descriptor *
     get_psblas_descriptor() const;
+
+    /**
+     * Get the underlying PSBLAS context.
+     */
+    psb_c_ctxt *
+    get_psblas_context() const;
 
     void
     clear();

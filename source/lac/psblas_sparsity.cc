@@ -38,7 +38,6 @@ namespace PSCToolkit
   SparsityPattern::SparsityPattern()
   {
     psblas_descriptor.reset();
-    psb_c_set_index_base(0); // Set index base to 0
   }
 
 
@@ -47,7 +46,6 @@ namespace PSCToolkit
   SparsityPattern::SparsityPattern(const IndexSet &index_set,
                                    const MPI_Comm  communicator)
   {
-    psb_c_set_index_base(0); // Set index base to 0
     SparsityPatternBase::resize(index_set.size(), index_set.size());
 
     Assert(communicator != MPI_COMM_NULL,

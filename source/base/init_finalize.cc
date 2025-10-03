@@ -165,7 +165,6 @@ InitFinalize::InitFinalize([[maybe_unused]] int    &argc,
 #ifdef DEAL_II_WITH_PSBLAS
   if (static_cast<bool>(libraries & InitializeLibrary::PSBLAS))
     {
-      std::cout << "Initializing PSBLAS..." << std::endl;
       cctxt = psb_c_new_ctxt();
       psb_c_init(cctxt);
       psb_c_set_index_base(0); // Set index base to 0

@@ -35,7 +35,6 @@ namespace PSCToolkit
   {
     psblas_sparse_matrix = nullptr;
     psblas_descriptor.reset();
-    psb_c_set_index_base(0); // Set index base to 0
   }
 
 
@@ -50,7 +49,6 @@ namespace PSCToolkit
 
     Assert(psblas_sparsity_pattern.psblas_descriptor.get() != nullptr,
            ExcMessage("The given SparsityPattern is not valid."));
-    psb_c_set_index_base(0); // Set index base to 0
 
     this->communicator = communicator;
     Assert(communicator != MPI_COMM_NULL,
@@ -334,6 +332,13 @@ namespace PSCToolkit
   SparseMatrix::compress()
   {
     // Finalize descriptor...
+
+    // We start by checking if the vector has already been assembled elsewhere
+    // int err = -1;
+    // if (!psb_c_cd_is_asb(psblas_descriptor.get()))
+    //   err = psb_c_cdasb(psblas_descriptor.get());
+    // TODO: uncomment the previous version once the function will be exposed
+    // from PSBLAS
     int err = psb_c_cdasb(psblas_descriptor.get());
     Assert(err == 0, ExcMessage("Error while compressing the matrix."));
 

@@ -28,8 +28,6 @@
 #  include <psb_c_base.h>
 #  include <psb_c_dbase.h>
 
-
-
 DEAL_II_NAMESPACE_OPEN
 
 namespace PSCToolkit
@@ -91,6 +89,14 @@ namespace PSCToolkit
         vl[i] = static_cast<psb_l_t>(indexes[i]);
       }
 
+    // TODO: ghost case
+    // first: cdall_vl con lidx
+    // then:
+    // psb_cdins(nz,ja,desc,info,lidx=lidx)
+    // ja: contiens halo indices
+    // lidx: corresponding local indices
+
+
     // Insert the indexes into the descriptor
     psb_c_cdall_vl(number_of_local_indexes,
                    vl,
@@ -122,6 +128,15 @@ namespace PSCToolkit
   {
     return psblas_descriptor.get();
   }
+
+
+
+  psb_c_ctxt *
+  Vector::get_psblas_context() const
+  {
+    return psblas_context;
+  }
+
 
 
   void
@@ -256,12 +271,27 @@ namespace PSCToolkit
     Assert(psblas_vector != nullptr && psblas_descriptor.get() != nullptr,
            ExcMessage("PSBLAS vector or descriptor is null."));
 
+    // We start by checking if the vector has already been assembled elsewhere
+    // int err = -1;
+    // if (!psb_c_cd_is_asb(psblas_descriptor.get()))
+    //   err = psb_c_cdasb(psblas_descriptor.get());
+    // TODO: uncomment the previous version once the function will be exposed
+    // from PSBLAS
     int err = psb_c_cdasb(psblas_descriptor.get());
     Assert(err == 0, ExcMessage("Error while finalizing descriptor."));
 
     err = psb_c_dgeasb(psblas_vector, psblas_descriptor.get());
     Assert(err == 0, ExcMessage("Error compressing PSBLAS vector."));
   }
+
+
+
+  void
+  Vector::update_ghost_values() const
+  {
+    psb_c_dhalo(psblas_vector, psblas_descriptor.get());
+  }
+
 
 
   bool
