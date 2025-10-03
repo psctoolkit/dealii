@@ -15,6 +15,7 @@
 
 #include "deal.II/base/config.h"
 
+#include "deal.II/base/exceptions.h"
 #include <deal.II/base/index_set.h>
 #include <deal.II/base/logstream.h>
 
@@ -37,6 +38,8 @@ namespace PSCToolkit
   Vector::Vector()
   {
     psblas_vector = nullptr;
+    if (psblas_descriptor.get() != nullptr)
+      psblas_descriptor.reset();
   }
 
 
@@ -227,14 +230,22 @@ namespace PSCToolkit
   Vector::value_type
   Vector::operator()(const Vector::size_type index) const
   {
-    // TODO: check index in range.
+    Assert(owned_elements.is_element(index),
+           ExcIndexRange(index,
+                         *owned_elements.begin(),
+                         *owned_elements.begin() +
+                           owned_elements.n_elements()));
     return psb_c_dgetelem(psblas_vector, index, psblas_descriptor.get());
   }
 
   Vector::VectorReference
   Vector::operator()(const size_type index)
   {
-    // TODO: check index in range.
+    Assert(owned_elements.is_element(index),
+           ExcIndexRange(index,
+                         *owned_elements.begin(),
+                         *owned_elements.begin() +
+                           owned_elements.n_elements()));
     return VectorReference(*this, index);
   }
 

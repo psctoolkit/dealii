@@ -91,7 +91,7 @@ namespace PSCToolkit
 
 
   void
-  SparseMatrix::reinit(const IndexSet &index_set, const MPI_Comm communicator)
+  SparseMatrix::reinit(const IndexSet &index_set, const MPI_Comm comm)
   {
     Assert((psblas_sparse_matrix == nullptr &&
             psblas_descriptor.get() == nullptr),
@@ -101,13 +101,13 @@ namespace PSCToolkit
     // Create the PSBLAS context from the MPI communicator. First, I convert the
     // MPI communicator to a Fortran-style communicator and initialize the
     // PSBLAS context from it.
-    Assert(communicator != MPI_COMM_NULL,
+    Assert(comm != MPI_COMM_NULL,
            ExcMessage("MPI_COMM_NULL passed to SparseMatrix::reinit()."));
+    communicator = comm;
     // Convert MPI_Comm to Fortran-style communicator
     MPI_Fint f_comm = MPI_Comm_c2f(communicator);
     psblas_context  = psb_c_new_ctxt();
     psb_c_init_from_fint(psblas_context, f_comm);
-
     // Create a new PSBLAS descriptor
     psblas_descriptor.reset(psb_c_new_descriptor());
 
