@@ -160,7 +160,6 @@ namespace PSCToolkit
   SparseMatrix::size_type
   SparseMatrix::n() const
   {
-    // TODO: function psb_c_cd_get_global_cols not exposed from PSBLAS
     return psb_c_cd_get_global_cols(psblas_descriptor.get());
   }
 
