@@ -83,6 +83,17 @@ namespace PSCToolkit
 
     using SparsityPatternBase::add_entries;
 
+    /**
+     * This function compresses the sparsity pattern and allows the resulting
+     * pattern to be used for actually generating a PSBLAS Sparse matrix.
+     * This function must therefore be called once the structure is fixed.
+     * Internally, it finalizes the descriptor object. This is a collective
+     * operation, i.e., it needs to be run on all processors when used in
+     * parallel.
+     */
+    void
+    compress();
+
   private:
     std::shared_ptr<psb_c_descriptor> psblas_descriptor;
 

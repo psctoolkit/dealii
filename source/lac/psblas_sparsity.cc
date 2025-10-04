@@ -125,6 +125,21 @@ namespace PSCToolkit
   {
     add_entries(row, columns.begin(), columns.end(), indices_are_sorted);
   }
+
+
+
+  void
+  SparsityPattern::compress()
+  {
+    Assert(psblas_descriptor.get() != nullptr,
+           ExcMessage("PSBLAS descriptor is null."));
+    int err = -1;
+    if (!psb_c_cd_is_asb(psblas_descriptor.get()))
+      {
+        err = psb_c_cdasb(psblas_descriptor.get());
+        Assert(err == 0, ExcMessage("Error while finalizing SparsityPattern."));
+      }
+  }
 } // namespace PSCToolkit
 
 DEAL_II_NAMESPACE_CLOSE

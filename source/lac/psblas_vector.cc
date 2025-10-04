@@ -272,13 +272,12 @@ namespace PSCToolkit
            ExcMessage("PSBLAS vector or descriptor is null."));
 
     // We start by checking if the vector has already been assembled elsewhere
-    // int err = -1;
-    // if (!psb_c_cd_is_asb(psblas_descriptor.get()))
-    //   err = psb_c_cdasb(psblas_descriptor.get());
-    // TODO: uncomment the previous version once the function will be exposed
-    // from PSBLAS
-    int err = psb_c_cdasb(psblas_descriptor.get());
-    Assert(err == 0, ExcMessage("Error while finalizing descriptor."));
+    int err = -1;
+    if (!psb_c_cd_is_asb(psblas_descriptor.get()))
+      {
+        err = psb_c_cdasb(psblas_descriptor.get());
+        Assert(err == 0, ExcMessage("Error while finalizing descriptor."));
+      }
 
     err = psb_c_dgeasb(psblas_vector, psblas_descriptor.get());
     Assert(err == 0, ExcMessage("Error compressing PSBLAS vector."));

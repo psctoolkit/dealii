@@ -161,7 +161,7 @@ namespace PSCToolkit
   SparseMatrix::n() const
   {
     // TODO: function psb_c_cd_get_global_cols not exposed from PSBLAS
-    return psb_c_cd_get_global_rows(psblas_descriptor.get());
+    return psb_c_cd_get_global_cols(psblas_descriptor.get());
   }
 
 
@@ -331,16 +331,13 @@ namespace PSCToolkit
   void
   SparseMatrix::compress()
   {
-    // Finalize descriptor...
-
     // We start by checking if the vector has already been assembled elsewhere
-    // int err = -1;
-    // if (!psb_c_cd_is_asb(psblas_descriptor.get()))
-    //   err = psb_c_cdasb(psblas_descriptor.get());
-    // TODO: uncomment the previous version once the function will be exposed
-    // from PSBLAS
-    int err = psb_c_cdasb(psblas_descriptor.get());
-    Assert(err == 0, ExcMessage("Error while compressing the matrix."));
+    int err = -1;
+    if (!psb_c_cd_is_asb(psblas_descriptor.get()))
+      {
+        err = psb_c_cdasb(psblas_descriptor.get());
+        Assert(err == 0, ExcMessage("Error while finalizing descriptor."));
+      }
 
     // Check if the sparse matrix is not already assembled
     if (!psb_c_dis_matasb(psblas_sparse_matrix, psblas_descriptor.get()))
