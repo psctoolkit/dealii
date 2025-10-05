@@ -15,8 +15,8 @@
 
 #include "deal.II/base/config.h"
 
-#include "deal.II/base/mpi.h"
 #include <deal.II/base/index_set.h>
+#include <deal.II/base/init_finalize.h>
 #include <deal.II/base/logstream.h>
 
 #include <psb_c_base.h>
@@ -32,16 +32,6 @@ DEAL_II_NAMESPACE_OPEN
 
 namespace PSCToolkit
 {
-
-
-  // SparsityPattern
-  SparsityPattern::SparsityPattern()
-  {
-    psblas_descriptor.reset();
-  }
-
-
-
   // SparsityPattern
   SparsityPattern::SparsityPattern(const IndexSet &index_set,
                                    const MPI_Comm  communicator)
@@ -50,13 +40,8 @@ namespace PSCToolkit
 
     Assert(communicator != MPI_COMM_NULL,
            ExcMessage("MPI_COMM_NULL passed to SparseMatrix::reinit()."));
-    // Convert MPI_Comm to Fortran-style communicator
-    MPI_Fint f_comm = MPI_Comm_c2f(communicator);
-    psblas_context  = psb_c_new_ctxt();
-    psb_c_init_from_fint(psblas_context, f_comm);
 
     psblas_descriptor.reset(psb_c_new_descriptor());
-
 
     // Use get_index_vector() from IndexSet to get the indexes
     const std::vector<types::global_dof_index> &indexes =
@@ -71,6 +56,7 @@ namespace PSCToolkit
       }
 
     // Insert the indexes into the descriptor
+    psblas_context = InitFinalize::get_psblas_context();
     psb_c_cdall_vl(number_of_local_indexes,
                    vl,
                    *psblas_context,

@@ -50,7 +50,7 @@ namespace PSCToolkit
     /**
      * Default constructor.
      */
-    SparsityPattern();
+    SparsityPattern() = default;
 
     /**
      * Constructor from an existing PSBLAS sparsity pattern.

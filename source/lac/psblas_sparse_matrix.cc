@@ -53,10 +53,6 @@ namespace PSCToolkit
     this->communicator = communicator;
     Assert(communicator != MPI_COMM_NULL,
            ExcMessage("MPI_COMM_NULL passed to SparseMatrix::reinit()."));
-    // Convert MPI_Comm to Fortran-style communicator
-    MPI_Fint f_comm = MPI_Comm_c2f(communicator);
-    psblas_context  = psb_c_new_ctxt();
-    psb_c_init_from_fint(psblas_context, f_comm);
 
     psblas_descriptor = psblas_sparsity_pattern.psblas_descriptor;
 
@@ -102,10 +98,7 @@ namespace PSCToolkit
     Assert(comm != MPI_COMM_NULL,
            ExcMessage("MPI_COMM_NULL passed to SparseMatrix::reinit()."));
     communicator = comm;
-    // Convert MPI_Comm to Fortran-style communicator
-    MPI_Fint f_comm = MPI_Comm_c2f(communicator);
-    psblas_context  = psb_c_new_ctxt();
-    psb_c_init_from_fint(psblas_context, f_comm);
+
     // Create a new PSBLAS descriptor
     psblas_descriptor.reset(psb_c_new_descriptor());
 
@@ -122,6 +115,7 @@ namespace PSCToolkit
       }
 
     // Insert the indexes into the descriptor
+    psblas_context = InitFinalize::get_psblas_context();
     psb_c_cdall_vl(number_of_local_indexes,
                    vl,
                    *psblas_context,
