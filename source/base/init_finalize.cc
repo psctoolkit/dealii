@@ -13,6 +13,7 @@
 //
 // ---------------------------------------------------------------------
 
+#include "deal.II/base/exception_macros.h"
 #include <deal.II/base/init_finalize.h>
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/multithread_info.h>
@@ -22,6 +23,7 @@
 #include <deal.II/lac/vector_memory.h>
 
 #include <Kokkos_Core.hpp>
+#include <psb_c_base.h>
 
 #ifdef DEAL_II_WITH_TRILINOS
 #  ifdef DEAL_II_WITH_MPI
@@ -55,6 +57,7 @@ DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 #  include <zoltan_cpp.h>
 #endif
 
+#include <iostream>
 #include <set>
 #include <string>
 
@@ -160,6 +163,19 @@ InitFinalize::InitFinalize([[maybe_unused]] int    &argc,
       sc_init(MPI_COMM_WORLD, 0, 0, nullptr, SC_LP_SILENT);
 #  endif
       p4est_init(nullptr, SC_LP_SILENT);
+    }
+#endif
+
+    // Initialize PSBLAS
+#ifdef DEAL_II_WITH_PSBLAS
+  if (static_cast<bool>(libraries & InitializeLibrary::PSBLAS))
+    {
+      cctxt = psb_c_new_ctxt();
+      Assert(cctxt != nullptr,
+             ExcMessage(
+               "Failed to create PSBLAS context during MPI initialization."));
+      psb_c_init(cctxt);
+      psb_c_set_index_base(0); // Set index base to 0
     }
 #endif
 
@@ -326,9 +342,22 @@ InitFinalize::unregister_request(MPI_Request &request)
 
 
 
+#ifdef DEAL_II_WITH_PSBLAS
+psb_c_ctxt *
+InitFinalize::get_psblas_context()
+{
+  Assert(cctxt != nullptr, ExcMessage("PSBLAS context was not initialized."));
+  return cctxt;
+}
+#endif
+
+
+
 std::set<MPI_Request *> InitFinalize::requests;
 
-
+#ifdef DEAL_II_WITH_PSBLAS
+psb_c_ctxt *InitFinalize::cctxt;
+#endif
 
 void
 InitFinalize::finalize()
@@ -408,6 +437,13 @@ InitFinalize::finalize()
         sc_finalize();
 #endif
 
+#ifdef DEAL_II_WITH_PSBLAS
+      if (static_cast<bool>(libraries & InitializeLibrary::PSBLAS))
+        {
+          psb_c_exit_ctxt(*cctxt);
+          free(cctxt);
+        }
+#endif
 
       // Finalize Kokkos
       if (static_cast<bool>(libraries & InitializeLibrary::Kokkos))

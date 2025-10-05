@@ -175,6 +175,11 @@ public:
   static void
   unregister_request(MPI_Request &request);
 
+#ifdef DEAL_II_WITH_PSBLAS
+  static psb_c_ctxt *
+  get_psblas_context();
+#endif
+
   /**
    * A structure that has boost::signal objects to register a call back
    * to run after MPI init or finalize.
@@ -213,6 +218,10 @@ private:
 
 #ifdef DEAL_II_WITH_PETSC
   bool finalize_petscslepc;
+#endif
+
+#ifdef DEAL_II_WITH_PSBLAS
+  static psb_c_ctxt *cctxt;
 #endif
 };
 
