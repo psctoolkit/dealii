@@ -18,6 +18,7 @@
 #include <deal.II/base/config.h>
 
 #include "deal.II/base/enable_observer_pointer.h"
+#include "deal.II/base/index_set.h"
 #include <deal.II/base/types.h>
 
 #include <memory.h>
@@ -187,6 +188,9 @@ namespace PSCToolkit
     VectorReference
     operator()(const size_type index);
 
+    const IndexSet &
+    locally_owned_elements() const;
+
     /**
      * Returns whether or not the vector has ghost elements.
      */
@@ -261,6 +265,12 @@ namespace PSCToolkit
   Vector::size() const
   {
     return owned_elements.size();
+  }
+
+  inline const IndexSet &
+  Vector::locally_owned_elements() const
+  {
+    return owned_elements;
   }
 
 } // namespace PSCToolkit
