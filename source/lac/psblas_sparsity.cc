@@ -100,6 +100,8 @@ namespace PSCToolkit
     int err = psb_c_cdins(nz, ia, ja, psblas_descriptor.get());
     Assert(err == 0,
            ExcMessage("Error inserting entries into PSBLAS descriptor."));
+    free(ia);
+    free(ja);
   }
 
 

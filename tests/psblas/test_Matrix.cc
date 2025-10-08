@@ -111,8 +111,8 @@ main(int argc, char **argv)
 
 
   output << "Process " << iam << " of  " << nproc
-         << " I have assembled a matrix of  " << psblas_matrix.local_size()
-         << " x " << psblas_matrix.local_size() << " size with "
+         << " I have assembled a matrix of  " << psblas_matrix.m() << " x "
+         << psblas_matrix.n() << " size with "
          << psblas_matrix.n_nonzero_elements() << " non-zero entries."
          << " The locally owned dofs are: " << locally_owned_dofs.n_elements()
          << " and the locally relevant dofs are: "

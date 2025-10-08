@@ -17,8 +17,8 @@
 
 #include <deal.II/base/config.h>
 
-#include "deal.II/base/enable_observer_pointer.h"
-#include "deal.II/base/index_set.h"
+#include <deal.II/base/exceptions.h>
+#include <deal.II/base/index_set.h>
 #include <deal.II/base/types.h>
 
 #include <memory.h>
@@ -34,7 +34,7 @@ DEAL_II_NAMESPACE_OPEN
 namespace PSCToolkit
 {
 
-  class Vector : public EnableObserverPointer
+  class Vector : public ReadVector<double>
   {
   private:
     /**
@@ -62,6 +62,7 @@ namespace PSCToolkit
       const VectorReference &
       operator=(const value_type &s) const
       {
+        Assert(!vector.has_ghost_elements(), ExcGhostsPresent());
         std::vector<size_type>  idx{index};
         std::vector<value_type> value{s};
         vector.set(idx, value);
@@ -72,8 +73,9 @@ namespace PSCToolkit
        * Add <tt>s</tt> to the referenced element of the vector.
        */
       const VectorReference &
-      operator+=(const TrilinosScalar &s) const
+      operator+=(const value_type &s) const
       {
+        Assert(!vector.has_ghost_elements(), ExcGhostsPresent());
         std::vector<size_type>  idx{index};
         std::vector<value_type> value{s};
         vector.add(idx, value);
@@ -86,6 +88,7 @@ namespace PSCToolkit
       const VectorReference &
       operator-=(const TrilinosScalar &s) const
       {
+        Assert(!vector.has_ghost_elements(), ExcGhostsPresent());
         std::vector<size_type>  idx{index};
         std::vector<value_type> value{-s};
         vector.add(idx, value);
@@ -96,8 +99,9 @@ namespace PSCToolkit
        * Multiply <tt>s</tt> to the referenced element of the vector.
        */
       const VectorReference &
-      operator*=(const TrilinosScalar &s) const
+      operator*=(const value_type &s) const
       {
+        Assert(!vector.has_ghost_elements(), ExcGhostsPresent());
         std::vector<size_type>  idx{index};
         value_type              new_value = static_cast<value_type>(*this) * s;
         std::vector<value_type> value{new_value};
@@ -109,8 +113,9 @@ namespace PSCToolkit
        * Divide <tt>s</tt> to the referenced element of the vector.
        */
       const VectorReference &
-      operator/=(const TrilinosScalar &s) const
+      operator/=(const value_type &s) const
       {
+        Assert(!vector.has_ghost_elements(), ExcGhostsPresent());
         std::vector<size_type>  idx{index};
         value_type              new_value = static_cast<value_type>(*this) / s;
         std::vector<value_type> value{new_value};
@@ -147,6 +152,10 @@ namespace PSCToolkit
     Vector(const IndexSet &local_partitioning,
            const MPI_Comm  communicator = MPI_COMM_WORLD);
 
+    Vector(const IndexSet &local_partitioning,
+           const IndexSet &ghost_indices,
+           const MPI_Comm  communicator = MPI_COMM_WORLD);
+
     ~Vector();
 
     void
@@ -154,18 +163,54 @@ namespace PSCToolkit
            const MPI_Comm  communicator = MPI_COMM_WORLD);
 
     /**
+     * Construct a new parallel ghosted PSBLAS vector from IndexSets.
+     *
+     * Note that the @p ghost IndexSet may be empty and that any indices
+     * already contained in @p local are ignored during construction. The
+     * global indices in ghost are supplied as ghost indices so that they can be
+     * read locally.
+     *
+     * @note This operation always creates a ghosted vector, which is considered
+     * read-only.
+     */
+    void
+    reinit(const IndexSet &local_partitioning,
+           const IndexSet &ghost_indices,
+           const MPI_Comm  communicator = MPI_COMM_WORLD);
+
+    /**
+     * Copy operator. Vectors are assumed to be of the same sizes.
+     * TODO(s): - be conforming with PETSc behaviour (resizing if necessary)
+     *          - document better
+     */
+    Vector &
+    operator=(const Vector &v);
+
+    /**
      * Return the global size of the vector, i.e. the sum of the local sizes
      * over all MPI processes.
      */
     size_type
-    size() const;
+    size() const override;
+
+    virtual void
+    extract_subvector_to(
+      const ArrayView<const types::global_dof_index> &indices,
+      const ArrayView<double>                        &elements) const override;
+
+
+    template <typename ForwardIterator, typename OutputIterator>
+    void
+    extract_subvector_to(ForwardIterator indices_begin,
+                         ForwardIterator indices_end,
+                         OutputIterator  values_begin) const;
 
     /*
      *  Return the local size of the vector, i.e., the number of indices owned
      * locally.
      */
     size_type
-    local_size() const;
+    locally_owned_size() const;
 
     void
     set(const std::vector<size_type>  &indices,
@@ -174,7 +219,6 @@ namespace PSCToolkit
     void
     add(const std::vector<size_type>  &indices,
         const std::vector<value_type> &values);
-
 
     /**
      * Provide read-only access to an element.
@@ -206,6 +250,18 @@ namespace PSCToolkit
     void
     compress();
 
+    value_type *
+    begin();
+
+    const value_type *
+    begin() const;
+
+    value_type *
+    end();
+
+    const value_type *
+    end() const;
+
     MPI_Comm
     get_mpi_communicator() const;
 
@@ -220,6 +276,12 @@ namespace PSCToolkit
      */
     psb_c_ctxt *
     get_psblas_context() const;
+
+    /**
+     * Get a pointer to the underlying PSBLAS vector.
+     */
+    psb_c_dvector *
+    get_psblas_vector() const;
 
     void
     clear();
@@ -244,6 +306,8 @@ namespace PSCToolkit
      */
     psb_c_ctxt *psblas_context;
 
+    value_type *data;
+
     /*
      * PSBLAS descriptor.
      */
@@ -253,8 +317,48 @@ namespace PSCToolkit
 
     IndexSet owned_elements;
 
+    IndexSet ghost_indices;
+
+    bool ghosted;
+
     friend class SparseMatrix;
   };
+
+
+  /* ----------------------------- Inline functions and templates
+   * ---------------- */
+
+
+  inline PSCToolkit::Vector::value_type *
+  PSCToolkit::Vector::begin()
+  {
+    return data;
+  }
+
+
+
+  inline const PSCToolkit::Vector::value_type *
+  PSCToolkit::Vector::begin() const
+  {
+    return data;
+  }
+
+
+
+  inline PSCToolkit::Vector::value_type *
+  PSCToolkit::Vector::end()
+  {
+    return data + locally_owned_size();
+  }
+
+
+
+  inline const PSCToolkit::Vector::value_type *
+  PSCToolkit::Vector::end() const
+  {
+    return data + locally_owned_size();
+  }
+
 
 
   /*
@@ -267,11 +371,75 @@ namespace PSCToolkit
     return owned_elements.size();
   }
 
+
+
   inline const IndexSet &
   Vector::locally_owned_elements() const
   {
     return owned_elements;
   }
+
+
+
+  inline bool
+  Vector::has_ghost_elements() const
+  {
+    return ghosted;
+  }
+
+
+
+  inline void
+  Vector::extract_subvector_to(
+    const ArrayView<const types::global_dof_index> &indices,
+    const ArrayView<double>                        &elements) const
+  {
+    AssertDimension(indices.size(), elements.size());
+    extract_subvector_to(indices.begin(), indices.end(), elements.begin());
+  }
+
+
+
+  template <typename ForwardIterator, typename OutputIterator>
+  inline void
+  Vector::extract_subvector_to(ForwardIterator indices_begin,
+                               ForwardIterator indices_end,
+                               OutputIterator  output) const
+  {
+    if (indices_begin == indices_end)
+      return;
+
+    if (ghosted)
+      {
+        Assert(false, ExcNotImplemented());
+      }
+    else
+      {
+        // no ghost elements, so we can
+        // just access the local
+        // elements directly
+        while (indices_begin != indices_end)
+          {
+            const size_type index = *indices_begin;
+            Assert(owned_elements.is_element(index),
+                   ExcMessage("You are accessing elements of a vector without "
+                              "ghost elements that are not actually owned by "
+                              "this vector. A typical case where this may "
+                              "happen is if you are passing a non-ghosted "
+                              "(completely distributed) vector to a function "
+                              "that expects a vector that stores ghost "
+                              "elements for all locally relevant or locally "
+                              "active vector entries."));
+
+            *output =
+              psb_c_dgetelem(psblas_vector, index, psblas_descriptor.get());
+
+            ++indices_begin;
+            ++output;
+          }
+      }
+  }
+
 
 } // namespace PSCToolkit
 DEAL_II_NAMESPACE_CLOSE

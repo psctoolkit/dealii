@@ -143,7 +143,7 @@ main(int argc, char **argv)
          << " x " << psblas_matrix.n() << " size with "
          << psblas_matrix.n_nonzero_elements()
          << " non-zero entries and a vector with "
-         << psblas_rhs_vector.local_size() << " entries."
+         << psblas_rhs_vector.locally_owned_size() << " entries."
          << " The locally owned dofs are: " << locally_owned_dofs.n_elements()
          << " and the locally relevant dofs are: "
          << locally_relevant_dofs.n_elements() << std::endl;
