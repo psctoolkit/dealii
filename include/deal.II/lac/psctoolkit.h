@@ -17,9 +17,9 @@
 
 #include <deal.II/base/config.h>
 
-#include "deal.II/base/enable_observer_pointer.h"
 #include "deal.II/base/index_set.h"
 #include <deal.II/base/array_view.h>
+#include <deal.II/base/observer_pointer.h>
 
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparsity_pattern_base.h>
