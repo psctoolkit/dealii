@@ -86,8 +86,8 @@ process_feature(PSBLAS
       ${_psblas_library_variables}
       ${_additional_libraries}
       LAPACK_LIBRARIES
-      # MPI_CXX_LIBRARIES
-      # MPI_Fortran_LIBRARIES
+       MPI_CXX_LIBRARIES
+      MPI_Fortran_LIBRARIES
   INCLUDE_DIRS 
     REQUIRED PSBLAS_INCLUDE_DIR
   LINKER_FLAGS
