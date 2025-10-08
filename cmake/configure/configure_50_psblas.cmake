@@ -22,7 +22,7 @@ macro(feature_psblas_find_external var)
     if(PSBLAS_FOUND)
         set(${var} TRUE)
 
-        set(_version_required .9.0)
+        set(_version_required 3.9.0)
         if(PSBLAS_VERSION VERSION_LESS ${_version_required})
             message(STATUS "Insufficient PSBLAS installation found: "
                 "At least version ${_version_required} is required."
