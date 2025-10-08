@@ -16,4 +16,25 @@
 # Configuration for the PSBLAS library:
 #
 
+macro(feature_psblas_find_external var)
+    find_package(DEAL_II_PSBLAS)
+
+    if(PSBLAS_FOUND)
+        set(${var} TRUE)
+
+        set(_version_required .9.0)
+        if(PSBLAS_VERSION VERSION_LESS ${_version_required})
+            message(STATUS "Insufficient PSBLAS installation found: "
+                "At least version ${_version_required} is required."
+                )
+            set(PSBLAS_ADDITIONAL_ERROR_STRING
+                "Insufficient PSBLAS installation found!\n"
+                "At least version ${_version_required} is required.\n"
+                )
+            set(${var} FALSE)
+
+        endif()
+    endif()
+endmacro()
+
 configure_feature(PSBLAS)
