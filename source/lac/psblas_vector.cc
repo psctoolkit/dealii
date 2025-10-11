@@ -12,18 +12,10 @@
 //
 // ------------------------------------------------------------------------
 
-
-#include "deal.II/base/config.h"
-
-#include "deal.II/base/exception_macros.h"
-#include "deal.II/base/exceptions.h"
-#include <deal.II/base/index_set.h>
-#include <deal.II/base/logstream.h>
+#include <deal.II/base/mpi.h>
 
 #include <deal.II/lac/psblas_vector.h>
 
-#include <cstddef>
-#include <cstdlib>
 #ifdef DEAL_II_WITH_PSBLAS
 
 #  include <psb_c_base.h>
@@ -37,7 +29,6 @@ namespace PSCToolkit
   Vector::Vector()
   {
     psblas_vector = nullptr;
-    data          = nullptr;
     ghosted       = false;
     if (psblas_descriptor.get() != nullptr)
       psblas_descriptor.reset();
@@ -251,8 +242,6 @@ namespace PSCToolkit
     if (has_ghost_elements())
       update_ghost_values();
 
-    data = psb_c_dvect_f_get_pnt(psblas_vector);
-
     return *this;
   }
 
@@ -270,15 +259,6 @@ namespace PSCToolkit
   Vector::get_psblas_descriptor() const
   {
     return psblas_descriptor.get();
-  }
-
-
-
-  psb_c_ctxt *
-  Vector::get_psblas_context() const
-  {
-    Assert(psblas_context != nullptr, ExcMessage("PSBLAS context is null."));
-    return psblas_context;
   }
 
 
@@ -301,12 +281,12 @@ namespace PSCToolkit
 
     // Reset the vector
     psblas_vector = nullptr;
-    data          = nullptr;
     owned_elements.clear();
     owned_elements.set_size(0);
     ghost_indices.clear();
     owned_elements.set_size(0);
   }
+
 
 
   double
@@ -324,10 +304,41 @@ namespace PSCToolkit
   }
 
 
+
   double
   Vector::l2_norm() const
   {
     return psb_c_dgenrm2(psblas_vector, psblas_descriptor.get());
+  }
+
+
+
+  bool
+  Vector::all_zero() const
+  {
+    // we get a pointer to the underlying vector and check if all
+    // entries are zero.
+    const value_type *start_ptr = psb_c_dvect_f_get_pnt(psblas_vector);
+    Assert(start_ptr != nullptr, ExcMessage("Error getting PSBLAS vector."));
+
+    const value_type *ptr = start_ptr, *eptr = start_ptr + locally_owned_size();
+    bool              flag = true;
+    while (ptr != eptr)
+      {
+        if (*ptr != value_type())
+          {
+            flag = false;
+            break;
+          }
+        ++ptr;
+      }
+
+    unsigned int has_nonzero = flag ? 0 : 1;
+
+    // check that the vector
+    // is zero on _all_ processors.
+    unsigned int num_nonzero = Utilities::MPI::sum(has_nonzero, communicator);
+    return num_nonzero == 0;
   }
 
 
@@ -448,8 +459,7 @@ namespace PSCToolkit
         Assert(err == 0, ExcMessage("Error while finalizing descriptor."));
       }
 
-    err  = psb_c_dgeasb(psblas_vector, psblas_descriptor.get());
-    data = psb_c_dvect_f_get_pnt(psblas_vector);
+    err = psb_c_dgeasb(psblas_vector, psblas_descriptor.get());
 
     Assert(err == 0, ExcMessage("Error compressing PSBLAS vector."));
   }

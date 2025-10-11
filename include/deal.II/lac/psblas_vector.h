@@ -240,6 +240,9 @@ namespace PSCToolkit
     const IndexSet &
     locally_owned_elements() const;
 
+    const IndexSet &
+    ghost_elements() const;
+
     /**
      * Returns whether or not the vector has ghost elements.
      */
@@ -271,19 +274,15 @@ namespace PSCToolkit
     get_mpi_communicator() const;
 
     /**
-     * Get the underlying PSBLAS descriptor.
+     * Get the underlying PSBLAS descriptor. Use it only when you know what you
+     * are doing.
      */
     psb_c_descriptor *
     get_psblas_descriptor() const;
 
     /**
-     * Get the underlying PSBLAS context.
-     */
-    psb_c_ctxt *
-    get_psblas_context() const;
-
-    /**
-     * Get a pointer to the underlying PSBLAS vector.
+     * Get a pointer to the underlying PSBLAS vector. Use it only when you know
+     * what you are doing.
      */
     psb_c_dvector *
     get_psblas_vector() const;
@@ -300,6 +299,9 @@ namespace PSCToolkit
     double
     l2_norm() const;
 
+    bool
+    all_zero() const;
+
   private:
     /*
      * Pointer to the underlying PSBLAS vector.
@@ -310,8 +312,6 @@ namespace PSCToolkit
      * PSBLAS context.
      */
     psb_c_ctxt *psblas_context;
-
-    value_type *data;
 
     /*
      * PSBLAS descriptor.
@@ -330,14 +330,13 @@ namespace PSCToolkit
   };
 
 
-  /* ----------------------------- Inline functions and templates
-   * ---------------- */
+  /* ----------------------------- Inline functions ---------------- */
 
 
   inline PSCToolkit::Vector::value_type *
   PSCToolkit::Vector::begin()
   {
-    return data;
+    return psb_c_dvect_f_get_pnt(psblas_vector);
   }
 
 
@@ -345,7 +344,7 @@ namespace PSCToolkit
   inline const PSCToolkit::Vector::value_type *
   PSCToolkit::Vector::begin() const
   {
-    return data;
+    return psb_c_dvect_f_get_pnt(psblas_vector);
   }
 
 
@@ -353,7 +352,7 @@ namespace PSCToolkit
   inline PSCToolkit::Vector::value_type *
   PSCToolkit::Vector::end()
   {
-    return data + locally_owned_size();
+    return psb_c_dvect_f_get_pnt(psblas_vector) + locally_owned_size();
   }
 
 
@@ -361,7 +360,7 @@ namespace PSCToolkit
   inline const PSCToolkit::Vector::value_type *
   PSCToolkit::Vector::end() const
   {
-    return data + locally_owned_size();
+    return psb_c_dvect_f_get_pnt(psblas_vector) + locally_owned_size();
   }
 
 
@@ -382,6 +381,14 @@ namespace PSCToolkit
   Vector::locally_owned_elements() const
   {
     return owned_elements;
+  }
+
+
+
+  inline const IndexSet &
+  Vector::ghost_elements() const
+  {
+    return ghost_indices;
   }
 
 
@@ -420,12 +427,48 @@ namespace PSCToolkit
                                ForwardIterator indices_end,
                                OutputIterator  output) const
   {
+    // Similar to the PETSc implementation in petsc_vector_base.h
     if (indices_begin == indices_end)
       return;
 
     if (ghosted)
       {
-        Assert(false, ExcNotImplemented());
+        // in this array, the locally
+        // owned elements come
+        // first followed by the
+        // ghost elements whose
+        // position we can get from
+        // an index set
+        types::global_dof_index begin = *owned_elements.begin();
+        types::global_dof_index end   = begin + owned_elements.n_elements();
+
+        auto input = indices_begin;
+        while (input != indices_end)
+          {
+            const auto index = static_cast<PetscInt>(*input);
+            // AssertIntegerConversion(index, *input);
+            // if (index >= begin && index < end)
+            if (owned_elements.is_element(index))
+              {
+                // local entry
+                // *output = *(ptr + index - begin);
+                *output =
+                  psb_c_dgetelem(psblas_vector, index, psblas_descriptor.get());
+              }
+            else
+              {
+                // ghost entry
+                const auto ghost_index = ghost_indices.index_within_set(*input);
+
+                // AssertIndexRange(ghost_index + end - begin, lsize);
+                *output = psb_c_dgetelem(psblas_vector,
+                                         ghost_index + end - begin,
+                                         psblas_descriptor.get());
+              }
+
+            ++input;
+            ++output;
+          }
       }
     else
       {
