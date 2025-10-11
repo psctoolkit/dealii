@@ -1,0 +1,2 @@
+Process 0 of  2 I have assembled a matrix of  2153 x 4225 size with 66049 non-zero entries and a vector with 2153 entries. The locally owned dofs are: 2153 and the locally relevant dofs are: 2319
+Process 1 of  2 I have assembled a matrix of  2072 x 4225 size with 66049 non-zero entries and a vector with 2072 entries. The locally owned dofs are: 2072 and the locally relevant dofs are: 2319
