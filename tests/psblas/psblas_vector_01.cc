@@ -11,6 +11,7 @@
 // LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
 // ------------------------------------------------------------------------
+#include "deal.II/base/mpi.h"
 #include <deal.II/base/exception_macros.h>
 #include <deal.II/base/logstream.h>
 
@@ -140,7 +141,8 @@ main(int argc, char **argv)
   for (const types::global_dof_index idx : locally_owned_dofs)
     difference += std::fabs(petsc_test_vector(idx) - psblas_rhs_vector(idx));
 
-  AssertThrow(difference < 1e-15, ExcInternalError());
+  AssertThrow(Utilities::MPI::sum(difference, mpi_communicator) < 1e-15,
+              ExcInternalError());
   deallog << "OK" << std::endl;
 
   return 0;
