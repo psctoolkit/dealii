@@ -29,7 +29,7 @@
 
 #include "psb_base_cbind.h"
 #include "psb_config.h"
-#include "amg_config.h"
+// #include "amg_config.h"
 
 int
 main(int argc, char **argv)
