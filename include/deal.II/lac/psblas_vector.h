@@ -149,6 +149,8 @@ namespace PSCToolkit
 
     Vector();
 
+    Vector(const Vector &);
+
     Vector(const IndexSet &local_partitioning,
            const MPI_Comm  communicator = MPI_COMM_WORLD);
 
@@ -196,8 +198,11 @@ namespace PSCToolkit
     virtual void
     extract_subvector_to(
       const ArrayView<const types::global_dof_index> &indices,
-      const ArrayView<double>                        &elements) const override;
+      const ArrayView<value_type>                    &elements) const override;
 
+    void
+    extract_subvector_to(const std::vector<size_type> &indices,
+                         std::vector<value_type>      &values) const;
 
     template <typename ForwardIterator, typename OutputIterator>
     void
@@ -398,6 +403,15 @@ namespace PSCToolkit
     extract_subvector_to(indices.begin(), indices.end(), elements.begin());
   }
 
+
+
+  inline void
+  Vector::extract_subvector_to(const std::vector<size_type>    &indices,
+                               std::vector<Vector::value_type> &values) const
+  {
+    AssertDimension(indices.size(), values.size());
+    extract_subvector_to(indices.begin(), indices.end(), values.begin());
+  }
 
 
   template <typename ForwardIterator, typename OutputIterator>

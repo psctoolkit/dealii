@@ -44,11 +44,26 @@ namespace PSCToolkit
   }
 
 
+  Vector::Vector(const Vector &v)
+    : Vector::Vector()
+  {
+    if (v.has_ghost_elements())
+      reinit(v.owned_elements, v.ghost_indices, v.communicator);
+    else
+      reinit(v.owned_elements, v.communicator);
+
+    this->operator=(v);
+  }
+
+
   Vector::~Vector()
   {
-    Assert(psblas_vector != nullptr, ExcMessage("PSBLAS vector is null."));
-    int err = psb_c_dgefree(psblas_vector, psblas_descriptor.get());
-    Assert(err == 0, ExcMessage("Error freeing PSBLAS vector."));
+    int err = -1;
+    if (psblas_vector != nullptr)
+      {
+        err = psb_c_dgefree(psblas_vector, psblas_descriptor.get());
+        Assert(err == 0, ExcMessage("Error freeing PSBLAS vector."));
+      }
   }
 
 
@@ -280,9 +295,16 @@ namespace PSCToolkit
   void
   Vector::clear()
   {
+    Assert(psblas_vector != nullptr, ExcMessage("PSBLAS vector is null."));
+    int err = psb_c_dgefree(psblas_vector, psblas_descriptor.get());
+    Assert(err == 0, ExcMessage("Error freeing PSBLAS vector."));
+
     // Reset the vector
     psblas_vector = nullptr;
+    data          = nullptr;
     owned_elements.clear();
+    owned_elements.set_size(0);
+    ghost_indices.clear();
     owned_elements.set_size(0);
   }
 

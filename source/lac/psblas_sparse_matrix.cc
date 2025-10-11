@@ -42,10 +42,8 @@ namespace PSCToolkit
   SparseMatrix::SparseMatrix(const SparsityPattern &psblas_sparsity_pattern,
                              const MPI_Comm         communicator)
   {
-    Assert((psblas_sparse_matrix == nullptr &&
-            psblas_descriptor.get() == nullptr),
-           ExcMessage(
-             "PSBLAS sparse matrix or descriptor must not be initialized."));
+    Assert(psblas_descriptor.get() == nullptr,
+           ExcMessage("PSBLAS matrix descriptor must not be initialized."));
 
     Assert(psblas_sparsity_pattern.psblas_descriptor.get() != nullptr,
            ExcMessage("The given SparsityPattern is not valid."));
