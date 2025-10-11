@@ -11,7 +11,6 @@
 // LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
 // ------------------------------------------------------------------------
-#include "deal.II/base/mpi.h"
 #include <deal.II/base/exception_macros.h>
 #include <deal.II/base/logstream.h>
 
@@ -19,7 +18,6 @@
 #include <deal.II/distributed/tria.h>
 
 #include <deal.II/dofs/dof_handler.h>
-#include <deal.II/dofs/dof_tools.h>
 
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_values.h>
@@ -30,8 +28,6 @@
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/petsc_vector.h>
 #include <deal.II/lac/psblas_vector.h>
-
-#include <deal.II/meshworker/mesh_loop.h>
 
 #include <psb_c_dbase.h>
 
