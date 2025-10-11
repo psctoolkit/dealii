@@ -418,22 +418,12 @@ namespace PSCToolkit
   Vector::value_type
   Vector::operator()(const Vector::size_type index) const
   {
-    Assert(owned_elements.is_element(index),
-           ExcIndexRange(index,
-                         *owned_elements.begin(),
-                         *owned_elements.begin() +
-                           owned_elements.n_elements()));
     return psb_c_dgetelem(psblas_vector, index, psblas_descriptor.get());
   }
 
   Vector::VectorReference
   Vector::operator()(const size_type index)
   {
-    Assert(owned_elements.is_element(index),
-           ExcIndexRange(index,
-                         *owned_elements.begin(),
-                         *owned_elements.begin() +
-                           owned_elements.n_elements()));
     return VectorReference(*this, index);
   }
 

@@ -86,7 +86,7 @@ namespace PSCToolkit
        * Subtract <tt>s</tt> to the referenced element of the vector.
        */
       const VectorReference &
-      operator-=(const TrilinosScalar &s) const
+      operator-=(const value_type &s) const
       {
         Assert(!vector.has_ghost_elements(), ExcGhostsPresent());
         std::vector<size_type>  idx{index};
@@ -129,6 +129,9 @@ namespace PSCToolkit
        */
       operator value_type() const
       {
+        AssertIndexRange(index, vector.size());
+        Assert(!vector.has_ghost_elements(), ExcGhostsPresent());
+
         return psb_c_dgetelem(vector.psblas_vector,
                               index,
                               vector.psblas_descriptor.get());
@@ -427,43 +430,29 @@ namespace PSCToolkit
                                ForwardIterator indices_end,
                                OutputIterator  output) const
   {
-    // Similar to the PETSc implementation in petsc_vector_base.h
     if (indices_begin == indices_end)
       return;
 
     if (ghosted)
       {
-        // in this array, the locally
-        // owned elements come
-        // first followed by the
-        // ghost elements whose
-        // position we can get from
-        // an index set
         types::global_dof_index begin = *owned_elements.begin();
         types::global_dof_index end   = begin + owned_elements.n_elements();
 
         auto input = indices_begin;
         while (input != indices_end)
           {
-            const auto index = static_cast<PetscInt>(*input);
-            // AssertIntegerConversion(index, *input);
-            // if (index >= begin && index < end)
-            if (owned_elements.is_element(index))
+            const auto index = static_cast<types::global_dof_index>(*input);
+            if (index >= begin && index < end)
               {
                 // local entry
-                // *output = *(ptr + index - begin);
                 *output =
                   psb_c_dgetelem(psblas_vector, index, psblas_descriptor.get());
               }
             else
               {
                 // ghost entry
-                const auto ghost_index = ghost_indices.index_within_set(*input);
-
-                // AssertIndexRange(ghost_index + end - begin, lsize);
-                *output = psb_c_dgetelem(psblas_vector,
-                                         ghost_index + end - begin,
-                                         psblas_descriptor.get());
+                *output =
+                  psb_c_dgetelem(psblas_vector, index, psblas_descriptor.get());
               }
 
             ++input;
