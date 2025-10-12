@@ -61,32 +61,6 @@ main(int argc, char **argv)
   else if (id == 1)
     locally_relevant_dofs.add_range(12, 15);
 
-  if (id == 0)
-    {
-      std::cout << "Locally owned indices on rank " << 0 << ": ";
-      for (const auto &idx : locally_owned_dofs)
-        std::cout << idx << " ";
-      std::cout << std::endl;
-
-      std::cout << "Locally relevant indices on rank " << 0 << ": ";
-      for (const auto &idx : locally_relevant_dofs)
-        std::cout << idx << " ";
-      std::cout << std::endl;
-    }
-
-  if (id == 1)
-    {
-      std::cout << "Locally owned indices on rank " << 1 << ": ";
-      for (const auto &idx : locally_owned_dofs)
-        std::cout << idx << " ";
-      std::cout << std::endl;
-
-      std::cout << "Locally relevant indices on rank " << 1 << ": ";
-      for (const auto &idx : locally_relevant_dofs)
-        std::cout << idx << " ";
-      std::cout << std::endl;
-    }
-
   PSCToolkit::Vector psblas_vector(locally_owned_dofs, mpi_communicator);
 
   for (const types::global_dof_index idx : locally_owned_dofs)
