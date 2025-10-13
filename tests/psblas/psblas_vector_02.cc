@@ -90,6 +90,9 @@ main(int argc, char **argv)
               ExcMessage("Norms do not match!"));
   AssertThrow(test_ghosted.linfty_norm() - psblas_vector.linfty_norm() < 1e-15,
               ExcMessage("Norms do not match!"));
+  // Test clear() and size()
+  psblas_vector.clear();
+  AssertThrow(psblas_vector.size() == 0, ExcInternalError());
   deallog << "OK" << std::endl;
 
 
