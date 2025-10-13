@@ -268,6 +268,18 @@ namespace PSCToolkit
     VectorReference
     operator()(const size_type index);
 
+    /**
+     * Provide read-only access to an element.
+     */
+    value_type
+    operator[](const size_type index) const;
+
+    /**
+     * Provide read-write access to an element of the vector.
+     */
+    VectorReference
+    operator[](const size_type index);
+
     value_type
     operator*(const Vector &v) const;
 
@@ -439,6 +451,37 @@ namespace PSCToolkit
     return ghosted;
   }
 
+
+
+  inline Vector::value_type
+  Vector::operator()(const Vector::size_type index) const
+  {
+    return psb_c_dgetelem(psblas_vector, index, psblas_descriptor.get());
+  }
+
+
+
+  inline Vector::VectorReference
+  Vector::operator()(const size_type index)
+  {
+    return VectorReference(*this, index);
+  }
+
+
+
+  inline Vector::value_type
+  Vector::operator[](const Vector::size_type index) const
+  {
+    return operator()(index);
+  }
+
+
+
+  inline Vector::VectorReference
+  Vector::operator[](const size_type index)
+  {
+    return operator()(index);
+  }
 
 
   inline void

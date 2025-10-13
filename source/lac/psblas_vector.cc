@@ -526,21 +526,6 @@ namespace PSCToolkit
 
 
 
-  Vector::value_type
-  Vector::operator()(const Vector::size_type index) const
-  {
-    return psb_c_dgetelem(psblas_vector, index, psblas_descriptor.get());
-  }
-
-
-
-  Vector::VectorReference
-  Vector::operator()(const size_type index)
-  {
-    return VectorReference(*this, index);
-  }
-
-
   void
   Vector::swap(Vector &v)
   {

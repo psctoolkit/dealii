@@ -119,12 +119,12 @@ main(int argc, char **argv)
   Assert(dot_product - std::pow(w.l2_norm(), 2) < 1e-11,
          ExcMessage("Test for add_and_dot() failed."));
 
-  //  Test equ()
+  //  Test equ(), while there we also use operator[]
   PSCToolkit::Vector v;
   v.reinit(locally_owned_dofs, mpi_communicator);
   v.equ(1.0, x);
   for (const types::global_dof_index idx : locally_owned_dofs)
-    AssertThrow(v(idx) == x(idx), ExcMessage("Test for equ() failed."));
+    AssertThrow(v[idx] == x[idx], ExcMessage("Test for equ() failed."));
 
   deallog << "Ok" << std::endl;
 
@@ -132,7 +132,10 @@ main(int argc, char **argv)
   PSCToolkit::Vector z;
   z.reinit(x, true);
   for (const types::global_dof_index idx : locally_owned_dofs)
-    AssertThrow(z(idx) == 0.0, ExcMessage("Entry not zero."));
+    AssertThrow(z[idx] == 0.0, ExcMessage("Entry not zero."));
+
+  // Test all_zeros()
+  AssertThrow(z.all_zero(), ExcMessage("Vector must be all zeros."));
 
   return 0;
 }
