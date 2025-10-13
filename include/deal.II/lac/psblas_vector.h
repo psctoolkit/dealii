@@ -165,7 +165,11 @@ namespace PSCToolkit
 
     void
     reinit(const IndexSet &local_partitioning,
-           const MPI_Comm  communicator = MPI_COMM_WORLD);
+           const MPI_Comm  communicator         = MPI_COMM_WORLD,
+           const bool      omit_zeroing_entries = false);
+
+    void
+    reinit(const Vector &v, const bool omit_zeroing_entries = false);
 
     /**
      * Construct a new parallel ghosted PSBLAS vector from IndexSets.
@@ -228,6 +232,30 @@ namespace PSCToolkit
     add(const std::vector<size_type>  &indices,
         const std::vector<value_type> &values);
 
+    void
+    add(const value_type s, const Vector &V);
+
+    value_type
+    add_and_dot(const value_type a, const Vector &v, const Vector &W);
+
+    /*
+     * Scaling and vector addition, i.e.  <tt>*this = s*(*this)+V</tt>.
+     */
+    void
+    sadd(const value_type s, const Vector &V);
+
+    /*
+     * Scaling and vector addition, i.e.  <tt>*this = s*(*this)+a*V</tt>.
+     */
+    void
+    sadd(const value_type s, const value_type a, const Vector &V);
+
+    /*
+     * Assignment *this = a*V.
+     */
+    void
+    equ(const value_type a, const Vector &v);
+
     /**
      * Provide read-only access to an element.
      */
@@ -239,6 +267,9 @@ namespace PSCToolkit
      */
     VectorReference
     operator()(const size_type index);
+
+    value_type
+    operator*(const Vector &v) const;
 
     const IndexSet &
     locally_owned_elements() const;
@@ -257,6 +288,9 @@ namespace PSCToolkit
      */
     void
     update_ghost_values() const;
+
+    void
+    swap(Vector &v);
 
     void
     compress();
@@ -293,17 +327,20 @@ namespace PSCToolkit
     void
     clear();
 
-    double
+    Vector::value_type
     linfty_norm() const;
 
-    double
+    Vector::value_type
     l1_norm() const;
 
-    double
+    Vector::value_type
     l2_norm() const;
 
     bool
     all_zero() const;
+
+    std::size_t
+    memory_consumption() const;
 
   private:
     /*

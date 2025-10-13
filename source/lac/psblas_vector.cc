@@ -12,12 +12,14 @@
 //
 // ------------------------------------------------------------------------
 
+
 #include <deal.II/base/mpi.h>
 
 #include <deal.II/lac/psblas_vector.h>
 
 #ifdef DEAL_II_WITH_PSBLAS
 
+#  include <psb_base_cbind.h>
 #  include <psb_c_base.h>
 #  include <psb_c_dbase.h>
 
@@ -81,8 +83,12 @@ namespace PSCToolkit
     reinit(local_partitioning, ghost_indices, communicator);
   }
 
+
+
   void
-  Vector::reinit(const IndexSet &local_partitioning, const MPI_Comm comm)
+  Vector::reinit(const IndexSet &local_partitioning,
+                 const MPI_Comm  comm,
+                 const bool      omit_zeroing_entries)
   {
     Assert(psblas_vector == nullptr,
            ExcMessage("PSBLAS vector must not be initialized."));
@@ -123,6 +129,12 @@ namespace PSCToolkit
 
     int err = psb_c_dgeall_remote(psblas_vector, psblas_descriptor.get());
     Assert(err == 0, ExcMessage("Error initializing PSBLAS vector."));
+
+    if (omit_zeroing_entries == false)
+      {
+        int err = psb_c_dvect_set_scal(psblas_vector, 0.0);
+        Assert(err == 0, ExcMessage("Error while zeroing PSBLAS vector."));
+      }
   }
 
 
@@ -223,6 +235,26 @@ namespace PSCToolkit
 
 
 
+  void
+  Vector::reinit(const Vector &v, const bool omit_zeroing_entries)
+  {
+    if (v.has_ghost_elements())
+      {
+        reinit(v.locally_owned_elements(),
+               v.ghost_indices,
+               v.get_mpi_communicator());
+        if (!omit_zeroing_entries)
+          {
+            int err = psb_c_dvect_set_scal(psblas_vector, 0.0);
+            Assert(err == 0, ExcMessage("Error while zeroing PSBLAS vector."));
+          }
+      }
+    else
+      reinit(v.owned_elements, v.get_mpi_communicator(), omit_zeroing_entries);
+  }
+
+
+
   Vector &
   Vector::operator=(const Vector &v)
   {
@@ -289,7 +321,7 @@ namespace PSCToolkit
 
 
 
-  double
+  Vector::value_type
   Vector::linfty_norm() const
   {
     return psb_c_dgenrmi(psblas_vector, psblas_descriptor.get());
@@ -297,7 +329,7 @@ namespace PSCToolkit
 
 
 
-  double
+  Vector::value_type
   Vector::l1_norm() const
   {
     return psb_c_dgeasum(psblas_vector, psblas_descriptor.get());
@@ -305,7 +337,7 @@ namespace PSCToolkit
 
 
 
-  double
+  Vector::value_type
   Vector::l2_norm() const
   {
     return psb_c_dgenrm2(psblas_vector, psblas_descriptor.get());
@@ -343,10 +375,37 @@ namespace PSCToolkit
 
 
 
+  void
+  Vector::equ(const value_type a, const Vector &v)
+  {
+    Assert(!has_ghost_elements(), ExcGhostsPresent());
+    AssertIsFinite(a);
+    Assert(size() == v.size(), ExcDimensionMismatch(size(), v.size()));
+
+    // this should be the same as VecAXPBY(vector, a, 0.0, v.vector) in PETSc,
+    // so we do:
+    int err = psb_c_dgeaxpby(
+      a, v.psblas_vector, 0.0, psblas_vector, psblas_descriptor.get());
+    AssertThrow(err == 0, ExcMessage("Error in equ()."));
+  }
+
+
+
   Vector::size_type
   Vector::locally_owned_size() const
   {
     return owned_elements.n_elements();
+  }
+
+
+
+  Vector::value_type
+  Vector::operator*(const Vector &v) const
+  {
+    Assert(size() == v.size(), ExcDimensionMismatch(size(), v.size()));
+    return psb_c_dgedot(psblas_vector,
+                        v.psblas_vector,
+                        psblas_descriptor.get());
   }
 
 
@@ -414,6 +473,58 @@ namespace PSCToolkit
   }
 
 
+  void
+  Vector::add(const value_type s, const Vector &V)
+  {
+    AssertIsFinite(s);
+    Assert(!has_ghost_elements(), ExcGhostsPresent());
+    psb_c_dgeaxpby(s,
+                   V.psblas_vector,
+                   value_type(1.0),
+                   psblas_vector,
+                   psblas_descriptor.get());
+  }
+
+
+
+  void
+  Vector::sadd(const value_type s, const Vector &V)
+  {
+    Assert(!has_ghost_elements(), ExcGhostsPresent());
+    AssertIsFinite(s);
+    int err = psb_c_dgeaxpby(value_type(1.0),
+                             V.psblas_vector,
+                             s,
+                             psblas_vector,
+                             psblas_descriptor.get());
+    Assert(err == 0, ExcMessage("Error in sadd()."));
+  }
+
+
+  void
+  Vector::sadd(const value_type s, const value_type a, const Vector &V)
+  {
+    Assert(!has_ghost_elements(), ExcGhostsPresent());
+    AssertIsFinite(s);
+    int err = psb_c_dgeaxpby(
+      a, V.psblas_vector, s, psblas_vector, psblas_descriptor.get());
+    Assert(err == 0, ExcMessage("Error in sadd()."));
+  }
+
+
+
+  Vector::value_type
+  Vector::add_and_dot(const value_type a, const Vector &V, const Vector &W)
+  {
+    // forward the call to add()...
+    add(a, V);
+    // ... and then do the dot product
+    return psb_c_dgedot(psblas_vector,
+                        W.psblas_vector,
+                        psblas_descriptor.get());
+  }
+
+
 
   Vector::value_type
   Vector::operator()(const Vector::size_type index) const
@@ -421,10 +532,26 @@ namespace PSCToolkit
     return psb_c_dgetelem(psblas_vector, index, psblas_descriptor.get());
   }
 
+
+
   Vector::VectorReference
   Vector::operator()(const size_type index)
   {
     return VectorReference(*this, index);
+  }
+
+
+  void
+  Vector::swap(Vector &v)
+  {
+    // simply swap pointers
+    std::swap(psblas_vector, v.psblas_vector);
+    std::swap(psblas_descriptor, v.psblas_descriptor);
+    std::swap(ghosted, v.ghosted);
+    // missing swap for IndexSet: we need to use temp variable
+    IndexSet temp(ghost_indices);
+    ghost_indices   = v.ghost_indices;
+    v.ghost_indices = temp;
   }
 
 
@@ -464,6 +591,17 @@ namespace PSCToolkit
         int err = psb_c_dhalo(psblas_vector, psblas_descriptor.get());
         Assert(err == 0, ExcMessage("Error updating ghost values."));
       }
+  }
+
+
+  std::size_t
+  Vector::memory_consumption() const
+  {
+    std::size_t mem = MemoryConsumption::memory_consumption(ghosted) +
+                      MemoryConsumption::memory_consumption(ghost_indices);
+
+    // mem += psb_c_sizeof(psblas_vector); TODO: missing from PSBLAS
+    return mem;
   }
 
 
