@@ -134,6 +134,13 @@ namespace PSCToolkit
         const bool = false,
         const bool = false);
 
+    void
+    add(const size_type                row,
+        const size_type                ncols,
+        const std::vector<size_type>  &col_indices,
+        const std::vector<value_type> &values,
+        const bool = false,
+        const bool = false);
 
     void
     add(const size_type   row,

@@ -257,10 +257,11 @@ namespace PSCToolkit
                     const SparseMatrix::size_type  j,
                     const SparseMatrix::value_type value)
   {
-    psb_l_t irw = i;
-    psb_l_t icl = j;
+    AssertIsFinite(value);
 
-    int info = psb_c_dspins(1 /*nz*/,
+    psb_l_t irw  = i;
+    psb_l_t icl  = j;
+    int     info = psb_c_dspins(1 /*nz*/,
                             &irw,
                             &icl,
                             &value,
@@ -281,12 +282,29 @@ namespace PSCToolkit
                     const bool)
   {
     Assert(col_indices.size() == ncols,
-           ExcMessage("Column indices size mismatch."));
+           ExcDimensionMismatch(col_indices.size(), ncols));
     // Call the function below taking a raw pointer from the vector
     add(row, ncols, col_indices.data(), values, false, false);
     ExcMessage("Error inserting values into PSBLAS sparse matrix.");
   }
 
+
+
+  void
+  SparseMatrix::add(const SparseMatrix::size_type                row,
+                    const SparseMatrix::size_type                ncols,
+                    const std::vector<SparseMatrix::size_type>  &col_indices,
+                    const std::vector<SparseMatrix::value_type> &values,
+                    const bool,
+                    const bool)
+  {
+    Assert(col_indices.size() == ncols,
+           ExcDimensionMismatch(col_indices.size(), ncols));
+    Assert(values.size() == ncols, ExcDimensionMismatch(ncols, values.size()));
+    // Call the function below taking a raw pointer from the vector
+    add(row, ncols, col_indices.data(), values.data(), false, false);
+    ExcMessage("Error inserting values into PSBLAS sparse matrix.");
+  }
 
 
   void
