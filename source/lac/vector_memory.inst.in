@@ -14,7 +14,7 @@
 
 
 
-for (VECTOR : VECTOR_TYPES)
+for (VECTOR : VECTOR_TYPES_WITH_PSBLAS)
   {
     template class VectorMemory<VECTOR>;
     template class GrowingVectorMemory<VECTOR>;

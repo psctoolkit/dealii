@@ -17,7 +17,6 @@
 
 #include <deal.II/base/config.h>
 
-#include "deal.II/base/enable_observer_pointer.h"
 #include "deal.II/base/index_set.h"
 #include <deal.II/base/array_view.h>
 
@@ -43,6 +42,10 @@ DEAL_II_NAMESPACE_OPEN
 
 namespace PSCToolkit
 {
+
+  // Forward declaration
+  class PreconditionAMG;
+
   class SparseMatrix : public EnableObserverPointer
   {
   public:
@@ -182,6 +185,10 @@ namespace PSCToolkit
     std::shared_ptr<psb_c_descriptor> psblas_descriptor;
 
     psb_c_ctxt *psblas_context;
+
+#  ifdef DEAL_II_WITH_AMG4PSBLAS
+    friend class PreconditionAMG;
+#  endif
   };
 
 

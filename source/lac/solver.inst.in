@@ -14,7 +14,7 @@
 
 
 
-for (S : VECTOR_TYPES)
+for (S : VECTOR_TYPES_WITH_PSBLAS)
   {
     template class SolverBase<S>;
   }

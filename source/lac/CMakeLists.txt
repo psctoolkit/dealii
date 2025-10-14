@@ -183,6 +183,7 @@ if(DEAL_II_WITH_PSBLAS)
     psblas_sparsity.cc
     psblas_vector.cc
     psblas_sparse_matrix.cc
+    psblas_precondition.cc
   )
 endif()
 
