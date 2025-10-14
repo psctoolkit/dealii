@@ -45,12 +45,95 @@ namespace PSCToolkit
      */
     using size_type = dealii::types::global_dof_index;
 
+    using value_type = double;
+
     /**
      * Standardized data struct to pipe additional flags to the
-     * preconditioner.
+     * preconditioner. See the AMG4PSBLAS documentation for possible
+     * parameters and their meaning.
      */
     struct AdditionalData
-    {};
+    {
+      AdditionalData(const char        *cycle_type            = "VCYCLE",
+                     const unsigned int n_cycles              = 1,
+                     const double       aggregation_threshold = 1e-2,
+                     const char        *aggregation_type      = "SOC1",
+                     const char        *smoother_type         = "FBGS",
+                     const unsigned int smoother_sweeps       = 2,
+                     const unsigned int smoother_degree       = 2,
+                     const char        *aggr_prol             = "SMOOTHED",
+                     const char        *coarse_type           = "BJAC",
+                     const char        *coarse_mat_type       = "REPL")
+        : cycle_type(cycle_type)
+        , n_cycles(n_cycles)
+        , aggregation_threshold(aggregation_threshold)
+        , aggregation_type(strdup(aggregation_type))
+        , smoother_type(smoother_type)
+        , smoother_sweeps(smoother_sweeps)
+        , smoother_degree(smoother_degree)
+        , aggr_prol(aggr_prol)
+        , coarse_type(coarse_type)
+        , coarse_mat_type(coarse_mat_type)
+      {}
+
+
+      /**
+       * Multilevel cycle. Possible values are "VCYCLE", "WCYCLE", "KCYCLE", and
+       * "ADD". See the AMG4PSBLAS documentation for details.
+       */
+      const char *cycle_type;
+
+      /*
+       * Number of multilevel cycles to be performed.
+       */
+      unsigned int n_cycles;
+
+      /**
+       * Threshold for the strength of connection algorithm. Defaults to 0.01.
+       */
+      double aggregation_threshold;
+
+      /**
+       * Type of aggregation algorithm. Possible values are "SOC1", "SOC2",
+       * "MATCHBOXP".
+       */
+      char *aggregation_type;
+
+      /**
+       * Type of smoother used in the multilevel preconditioner.
+       */
+      const char *smoother_type;
+
+      /**
+       * Number of sweeps of the smoother or one-level preconditioner.
+       */
+      unsigned int smoother_sweeps;
+
+      /**
+       * Degree of the polynomial smoother, which equals the number of
+       * matrix-vector products performed by the smoother. Ignored if the
+       * smoother is not 'POLY'.
+       */
+      unsigned int smoother_degree;
+
+      /**
+       * Prolongator used by the aggregation algorithm: smoothed or unsmoothed
+       * (i.e., tentative prolongator).
+       */
+      const char *aggr_prol;
+
+      /**
+       * Solver used at the coarsest level. See AMG4PSBLAS documentation for
+       * possible values.
+       */
+      const char *coarse_type;
+
+      /**
+       * Coarsest matrix layout: distributed among processes, or replicated on
+       * each one.
+       */
+      const char *coarse_mat_type;
+    };
 
     /**
      * Constructor. Does not do anything. The <tt>initialize</tt> function of
@@ -119,6 +202,11 @@ namespace PSCToolkit
      * applying the preconditioner.
      */
     amg_c_dprec *psblas_preconditioner;
+
+    /**
+     * Workspace vector for AMG4PSBLAS operations.
+     */
+    psb_c_dvector *workspace;
 
     /*
      * PSBLAS descriptor.

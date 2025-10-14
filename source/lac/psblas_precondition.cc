@@ -34,38 +34,74 @@ namespace PSCToolkit
     Assert(matrix.psblas_sparse_matrix != nullptr,
            ExcMessage("Matrix has not been initialized."));
 
-    // set descriptor
+    // set descriptor from matrix and allocate workspace with proper size
     psblas_descriptor = matrix.psblas_descriptor;
 
-    // TODO: fill ptype through AdditionalData parameters
-
-    char ptype[40];
-    strcpy(ptype, "ML");
+    // Allocate workspace with size according to AMG4PSBLAS documentation
+    // Size should be at least 4 * psb_cd_get_local_cols(desc_a)
+    workspace = psb_c_new_dvector();
+    psb_c_dgeall_remote(workspace, psblas_descriptor.get());
 
     int err = amg_c_dprecinit(*InitFinalize::get_psblas_context(),
                               psblas_preconditioner,
-                              ptype);
-    amg_c_dprecseti(psblas_preconditioner, "SMOOTHER_SWEEPS", 2);
-    amg_c_dprecseti(psblas_preconditioner, "SUB_FILLIN", 1);
-    amg_c_dprecsetc(psblas_preconditioner, "COARSE_SOLVE", "BJAC");
-    amg_c_dprecsetc(psblas_preconditioner, "COARSE_SUBSOLVE", "ILU");
-    amg_c_dprecseti(psblas_preconditioner, "COARSE_FILLIN", 0);
+                              "ML");
+
+    amg_c_dprecsetc(psblas_preconditioner,
+                    "ML_CYCLE",
+                    additional_data.cycle_type);
+    amg_c_dprecseti(psblas_preconditioner,
+                    "CYCLE_SWEEPS",
+                    additional_data.n_cycles);
+    amg_c_dprecsetr(psblas_preconditioner,
+                    "AGGR_THRSH",
+                    additional_data.aggregation_threshold);
+    amg_c_dprecsetc(psblas_preconditioner,
+                    "AGGR_TYPE",
+                    additional_data.aggregation_type);
+    amg_c_dprecsetc(psblas_preconditioner,
+                    "AGGR_PROL",
+                    additional_data.aggr_prol);
+    amg_c_dprecsetc(psblas_preconditioner,
+                    "SMOOTHER_TYPE",
+                    additional_data.smoother_type);
+    amg_c_dprecseti(psblas_preconditioner,
+                    "SMOOTHER_SWEEPS",
+                    additional_data.smoother_sweeps);
+    if (additional_data.smoother_type == std::string("POLY"))
+      amg_c_dprecseti(psblas_preconditioner,
+                      "POLY_DEGREE",
+                      additional_data.smoother_degree);
+    amg_c_dprecsetc(psblas_preconditioner,
+                    "COARSE_SOLVE",
+                    additional_data.coarse_type);
+    amg_c_dprecsetc(psblas_preconditioner,
+                    "SMOOTHER_TYPE",
+                    additional_data.coarse_mat_type);
 
     // build AMG hierarchy
     err = amg_c_dhierarchy_build(matrix.psblas_sparse_matrix,
                                  psblas_descriptor.get(),
                                  psblas_preconditioner);
     //... and smoothers
-    AssertThrow(err == 0, ExcMessage("Error while building AMG hierarchy."));
+    AssertThrow(err == 0,
+                ExcMessage("Error " + std::to_string(err) +
+                           " while building AMG hierarchy."));
     err = amg_c_dsmoothers_build(matrix.psblas_sparse_matrix,
                                  psblas_descriptor.get(),
                                  psblas_preconditioner);
-    AssertThrow(err == 0, ExcMessage("Error while building AMG smoothers."));
+    AssertThrow(err == 0,
+                ExcMessage("Error " + std::to_string(err) +
+                           " while building AMG smoothers."));
   }
 
 
   PreconditionAMG::~PreconditionAMG()
   {
+    if (workspace != nullptr)
+      {
+        psb_c_dgefree(workspace, psblas_descriptor.get());
+        free(workspace);
+      }
     free(psblas_preconditioner);
   }
 
@@ -81,13 +117,17 @@ namespace PSCToolkit
   void
   PreconditionAMG::vmult(Vector &dst, const Vector &src) const
   {
-    // TODO: expose apply routine to C interface
-    // int err = amg_c_dapply(dst.psblas_vector,
-    //                        src.psblas_vector,
-    //                        psblas_descriptor.get(),
-    //                        false /* trans*/);
-    // Assert(ierr == 0,
-    //        ExcMessage("Failure while applying preconditioner on a vector."));
+    Assert((dst.size() == src.size()), ExcMessage("Dimension mismatch."));
+
+    char transpose = 'N';
+    int  err       = amg_c_dprecaply(psblas_preconditioner,
+                              src.psblas_vector,
+                              dst.psblas_vector,
+                              psblas_descriptor.get(),
+                              &transpose /* transpose*/,
+                              workspace /* workspace */);
+    Assert(err == 0,
+           ExcMessage("Failure while applying preconditioner on a vector."));
   }
 
 
@@ -95,15 +135,18 @@ namespace PSCToolkit
   void
   PreconditionAMG::Tvmult(Vector &dst, const Vector &src) const
   {
-    // TODO: expose apply routine to C interface
-    // int err = amg_c_dapply(dst.psblas_vector,
-    //                        src.psblas_vector,
-    //                        psblas_descriptor.get(),
-    //                        true /* trans*/);
-    // Assert(ierr == 0,
-    //        ExcMessage(
-    //          "Failure while applying preconditioner (transpose) on a
-    //          vector."));
+    Assert((dst.size() == src.size()), ExcMessage("Dimension mismatch."));
+
+    char transpose = 'T';
+    int  err       = amg_c_dprecaply(psblas_preconditioner,
+                              src.psblas_vector,
+                              dst.psblas_vector,
+                              psblas_descriptor.get(),
+                              &transpose /* transpose*/,
+                              workspace /* workspace */);
+    Assert(err == 0,
+           ExcMessage(
+             "Failure while applying preconditioner (transpose) on a vector."));
   }
 
 

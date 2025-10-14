@@ -13,6 +13,7 @@
 // ------------------------------------------------------------------------
 
 
+#include "deal.II/base/exceptions.h"
 #include <deal.II/base/mpi.h>
 
 #include <deal.II/lac/psblas_vector.h>
@@ -90,8 +91,8 @@ namespace PSCToolkit
                  const MPI_Comm  comm,
                  const bool      omit_zeroing_entries)
   {
-    Assert(psblas_vector == nullptr,
-           ExcMessage("PSBLAS vector must not be initialized."));
+    // Assert(psblas_vector == nullptr,
+    //        ExcMessage("PSBLAS vector must not be initialized."));
 
     Assert(communicator != MPI_COMM_NULL,
            ExcMessage("MPI_COMM_NULL passed to Vector::reinit()."));
@@ -408,6 +409,21 @@ namespace PSCToolkit
                         psblas_descriptor.get());
   }
 
+
+
+  Vector &
+  Vector::operator-=(const Vector &v)
+  {
+    Assert(size() == v.size(), ExcDimensionMismatch(size(), v.size()));
+    Assert(!has_ghost_elements(), ExcGhostsPresent());
+    int err = psb_c_dgeaxpby(value_type(-1.0),
+                             v.psblas_vector,
+                             1.0,
+                             psblas_vector,
+                             psblas_descriptor.get());
+    AssertThrow(err == 0, ExcMessage("Error while subtracting vectors."));
+    return *this;
+  }
 
 
   void

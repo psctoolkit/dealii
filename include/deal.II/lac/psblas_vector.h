@@ -280,8 +280,17 @@ namespace PSCToolkit
     VectorReference
     operator[](const size_type index);
 
+    /**
+     * Dot product of the vector with another vector.
+     */
     value_type
     operator*(const Vector &v) const;
+
+    /**
+     * Subtract the given vector from the present one.
+     */
+    Vector &
+    operator-=(const Vector &v);
 
     const IndexSet &
     locally_owned_elements() const;
@@ -379,6 +388,10 @@ namespace PSCToolkit
     bool ghosted;
 
     friend class SparseMatrix;
+
+#  ifdef DEAL_II_WITH_AMG4PSBLAS
+    friend class PreconditionAMG;
+#  endif
   };
 
 
