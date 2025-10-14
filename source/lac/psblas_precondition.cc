@@ -119,13 +119,17 @@ namespace PSCToolkit
   {
     Assert((dst.size() == src.size()), ExcMessage("Dimension mismatch."));
 
-    char transpose = 'N';
-    int  err       = amg_c_dprecaply(psblas_preconditioner,
-                              src.psblas_vector,
-                              dst.psblas_vector,
-                              psblas_descriptor.get(),
-                              &transpose /* transpose*/,
-                              workspace /* workspace */);
+    // char transpose = 'N';
+    // int  err       = amg_c_dprecaply(psblas_preconditioner,
+    //                           src.psblas_vector,
+    //                           dst.psblas_vector,
+    //                           psblas_descriptor.get(),
+    //                           &transpose /* transpose*/,
+    //                           workspace /* workspace */);
+    int err = amg_c_dprecapply(psblas_preconditioner,
+                               src.psblas_vector,
+                               dst.psblas_vector,
+                               psblas_descriptor.get());
     Assert(err == 0,
            ExcMessage("Failure while applying preconditioner on a vector."));
   }
@@ -136,17 +140,18 @@ namespace PSCToolkit
   PreconditionAMG::Tvmult(Vector &dst, const Vector &src) const
   {
     Assert((dst.size() == src.size()), ExcMessage("Dimension mismatch."));
-
-    char transpose = 'T';
-    int  err       = amg_c_dprecaply(psblas_preconditioner,
-                              src.psblas_vector,
-                              dst.psblas_vector,
-                              psblas_descriptor.get(),
-                              &transpose /* transpose*/,
-                              workspace /* workspace */);
-    Assert(err == 0,
-           ExcMessage(
-             "Failure while applying preconditioner (transpose) on a vector."));
+    Assert(false, ExcNotImplemented());
+    // char transpose = 'T';
+    // int  err       = amg_c_dprecaply(psblas_preconditioner,
+    //                           src.psblas_vector,
+    //                           dst.psblas_vector,
+    //                           psblas_descriptor.get(),
+    //                           &transpose /* transpose*/,
+    //                           workspace /* workspace */);
+    // Assert(err == 0,
+    //        ExcMessage(
+    //          "Failure while applying preconditioner (transpose) on a
+    //          vector."));
   }
 
 
