@@ -149,7 +149,7 @@ namespace PSCToolkit
     ~PreconditionAMG();
 
     /**
-     * Let Trilinos compute a multilevel hierarchy for the solution of a
+     * Let AMG4PSBLAS compute a multilevel hierarchy for the solution of a
      * linear system with the given matrix. The function uses the matrix
      * format specified in PSCToolkit::SparseMatrix.
      */
@@ -170,6 +170,13 @@ namespace PSCToolkit
     MPI_Comm
     get_mpi_communicator() const;
 
+    /**
+     * Return the pointer the underlying preconditioner. This is for advanced
+     * users only who want to try out additional features of the AMG4PSBLAS
+     * preconditioner not supported through the current interface.
+     */
+    amg_c_dprec *
+    get_psblas_preconditioner();
 
     /**
      * Apply the preconditioner.
@@ -197,13 +204,6 @@ namespace PSCToolkit
      * PSBLAS descriptor.
      */
     std::shared_ptr<psb_c_descriptor> psblas_descriptor;
-
-
-    /**
-     * Internal communication pattern in case the matrix needs to be copied
-     * from deal.II format.
-     */
-    MPI_Comm communicator;
   };
 
 } // namespace PSCToolkit

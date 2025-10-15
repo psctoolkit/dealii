@@ -117,14 +117,6 @@ namespace PSCToolkit
 
 
 
-  MPI_Comm
-  PreconditionAMG::get_mpi_communicator() const
-  {
-    return communicator;
-  }
-
-
-
   void
   PreconditionAMG::vmult(Vector &dst, const Vector &src) const
   {
