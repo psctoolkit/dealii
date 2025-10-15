@@ -164,11 +164,6 @@ namespace PSCToolkit
     void
     clear();
 
-    /**
-     * Return the underlying MPI communicator.
-     */
-    MPI_Comm
-    get_mpi_communicator() const;
 
     /**
      * Return the pointer the underlying preconditioner. This is for advanced

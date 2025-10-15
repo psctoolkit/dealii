@@ -117,6 +117,14 @@ namespace PSCToolkit
 
 
 
+  amg_c_dprec *
+  PreconditionAMG::get_psblas_preconditioner()
+  {
+    return psblas_preconditioner;
+  }
+
+
+
   void
   PreconditionAMG::vmult(Vector &dst, const Vector &src) const
   {
