@@ -12,6 +12,8 @@
 //
 // ------------------------------------------------------------------------
 
+#include "deal.II/base/exception_macros.h"
+
 #include <deal.II/lac/psblas_precondition.h>
 
 #ifdef DEAL_II_WITH_AMG4PSBLAS
@@ -37,11 +39,6 @@ namespace PSCToolkit
     // set descriptor from matrix and allocate workspace with proper size
     psblas_descriptor = matrix.psblas_descriptor;
 
-    // Allocate workspace with size according to AMG4PSBLAS documentation
-    // Size should be at least 4 * psb_cd_get_local_cols(desc_a)
-    workspace = psb_c_new_dvector();
-    psb_c_dgeall_remote(workspace, psblas_descriptor.get());
-
     int err = amg_c_dprecinit(*InitFinalize::get_psblas_context(),
                               psblas_preconditioner,
                               "ML");
@@ -64,13 +61,17 @@ namespace PSCToolkit
     amg_c_dprecsetc(psblas_preconditioner,
                     "SMOOTHER_TYPE",
                     additional_data.smoother_type);
-    amg_c_dprecseti(psblas_preconditioner,
-                    "SMOOTHER_SWEEPS",
-                    additional_data.smoother_sweeps);
-    if (additional_data.smoother_type == std::string("POLY"))
+    // from the AMG4PSBLAS manual: if "SMOOTHER_TYPE" is set to
+    // "POLY", then "SMOOTHER_SWEEPS" is ignored and the
+    // polynomial degree is used instead.
+    if (std::strcmp(additional_data.smoother_type, "POLY") == 0)
       amg_c_dprecseti(psblas_preconditioner,
                       "POLY_DEGREE",
                       additional_data.smoother_degree);
+    else
+      amg_c_dprecseti(psblas_preconditioner,
+                      "SMOOTHER_SWEEPS",
+                      additional_data.smoother_sweeps);
     amg_c_dprecsetc(psblas_preconditioner,
                     "COARSE_SOLVE",
                     additional_data.coarse_type);
@@ -82,10 +83,10 @@ namespace PSCToolkit
     err = amg_c_dhierarchy_build(matrix.psblas_sparse_matrix,
                                  psblas_descriptor.get(),
                                  psblas_preconditioner);
-    //... and smoothers
     AssertThrow(err == 0,
                 ExcMessage("Error " + std::to_string(err) +
                            " while building AMG hierarchy."));
+    //... and smoothers
     err = amg_c_dsmoothers_build(matrix.psblas_sparse_matrix,
                                  psblas_descriptor.get(),
                                  psblas_preconditioner);
@@ -97,13 +98,23 @@ namespace PSCToolkit
 
   PreconditionAMG::~PreconditionAMG()
   {
-    if (workspace != nullptr)
-      {
-        psb_c_dgefree(workspace, psblas_descriptor.get());
-        free(workspace);
-      }
+    if (psblas_preconditioner)
+      try
+        {
+          clear();
+        }
+      catch (...)
+        {}
+  }
+
+
+
+  void
+  PreconditionAMG::clear()
+  {
     free(psblas_preconditioner);
   }
+
 
 
   MPI_Comm
@@ -117,15 +128,7 @@ namespace PSCToolkit
   void
   PreconditionAMG::vmult(Vector &dst, const Vector &src) const
   {
-    Assert((dst.size() == src.size()), ExcMessage("Dimension mismatch."));
-
-    // char transpose = 'N';
-    // int  err       = amg_c_dprecaply(psblas_preconditioner,
-    //                           src.psblas_vector,
-    //                           dst.psblas_vector,
-    //                           psblas_descriptor.get(),
-    //                           &transpose /* transpose*/,
-    //                           workspace /* workspace */);
+    AssertDimension(dst.size(), src.size());
     int err = amg_c_dprecapply(psblas_preconditioner,
                                src.psblas_vector,
                                dst.psblas_vector,
@@ -141,17 +144,6 @@ namespace PSCToolkit
   {
     Assert((dst.size() == src.size()), ExcMessage("Dimension mismatch."));
     Assert(false, ExcNotImplemented());
-    // char transpose = 'T';
-    // int  err       = amg_c_dprecaply(psblas_preconditioner,
-    //                           src.psblas_vector,
-    //                           dst.psblas_vector,
-    //                           psblas_descriptor.get(),
-    //                           &transpose /* transpose*/,
-    //                           workspace /* workspace */);
-    // Assert(err == 0,
-    //        ExcMessage(
-    //          "Failure while applying preconditioner (transpose) on a
-    //          vector."));
   }
 
 

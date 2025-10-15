@@ -167,8 +167,6 @@ main(int argc, char **argv)
   SolverCG<PSCToolkit::Vector> solver(solver_control);
   PSCToolkit::Vector           solution(locally_owned_dofs, mpi_communicator);
 
-  if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-    std::cout << "Number of DoFs: " << dof_handler.n_dofs() << std::endl;
   solver.solve(psblas_matrix,
                solution,
                psblas_rhs_vector,

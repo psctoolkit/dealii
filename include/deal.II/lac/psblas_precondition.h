@@ -105,7 +105,8 @@ namespace PSCToolkit
       const char *smoother_type;
 
       /**
-       * Number of sweeps of the smoother or one-level preconditioner.
+       * Number of sweeps of the smoother or one-level preconditioner. It is
+       * ignored if the smoother is "POLY".
        */
       unsigned int smoother_sweeps;
 
@@ -169,17 +170,6 @@ namespace PSCToolkit
     MPI_Comm
     get_mpi_communicator() const;
 
-    /**
-     * Sets an internal flag so that all operations performed by the matrix,
-     * i.e., multiplications, are done in transposed order. However, this does
-     * not reshape the matrix to transposed form directly, so care should be
-     * taken when using this flag.
-     *
-     * @note Calling this function any even number of times in succession will
-     * return the object to its original state.
-     */
-    void
-    transpose();
 
     /**
      * Apply the preconditioner.
@@ -196,17 +186,12 @@ namespace PSCToolkit
 
     friend class SolverBase;
 
-  protected:
+  private:
     /**
      * This is a pointer to the preconditioner object that is used when
      * applying the preconditioner.
      */
     amg_c_dprec *psblas_preconditioner;
-
-    /**
-     * Workspace vector for AMG4PSBLAS operations.
-     */
-    psb_c_dvector *workspace;
 
     /*
      * PSBLAS descriptor.
