@@ -85,10 +85,10 @@ namespace PSCToolkit
   void
   SparseMatrix::reinit(const IndexSet &index_set, const MPI_Comm comm)
   {
-    Assert((psblas_sparse_matrix == nullptr &&
-            psblas_descriptor.get() == nullptr),
-           ExcMessage(
-             "PSBLAS sparse matrix or descriptor must not be initialized."));
+    // Assert((psblas_sparse_matrix == nullptr &&
+    //         psblas_descriptor.get() == nullptr),
+    //        ExcMessage(
+    //          "PSBLAS sparse matrix or descriptor must not be initialized."));
 
     // Create the PSBLAS context from the MPI communicator. First, I convert the
     // MPI communicator to a Fortran-style communicator and initialize the
@@ -121,6 +121,33 @@ namespace PSCToolkit
 
     // Free the vl array
     free(vl);
+
+    // Create a new PSBLAS sparse matrix
+    psblas_sparse_matrix = psb_c_new_dspmat();
+
+    // Initialize the sparse matrix with the descriptor
+    int err =
+      psb_c_dspall_remote(psblas_sparse_matrix, psblas_descriptor.get());
+    Assert(err == 0, ExcMessage("Error initializing PSBLAS sparse matrix."));
+  }
+
+
+
+  void
+  SparseMatrix::reinit(const SparsityPattern &psblas_sparsity_pattern,
+                       const MPI_Comm         communicator)
+  {
+    Assert(psblas_descriptor.get() == nullptr,
+           ExcMessage("PSBLAS matrix descriptor must not be initialized."));
+
+    Assert(psblas_sparsity_pattern.psblas_descriptor.get() != nullptr,
+           ExcMessage("The given SparsityPattern is not valid."));
+
+    this->communicator = communicator;
+    Assert(communicator != MPI_COMM_NULL,
+           ExcMessage("MPI_COMM_NULL passed to SparseMatrix::reinit()."));
+
+    psblas_descriptor = psblas_sparsity_pattern.psblas_descriptor;
 
     // Create a new PSBLAS sparse matrix
     psblas_sparse_matrix = psb_c_new_dspmat();

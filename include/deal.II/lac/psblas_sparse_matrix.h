@@ -84,6 +84,14 @@ namespace PSCToolkit
     reinit(const IndexSet &parallel_partitioning,
            const MPI_Comm  communicator = MPI_COMM_WORLD);
 
+    /**
+     * Construtor using an IndexSet and a MPI communicator to describe the
+     * parallel partitioning of the matrix.
+     */
+    void
+    reinit(const SparsityPattern &psblas_sparsity_pattern,
+           const MPI_Comm         communicator = MPI_COMM_WORLD);
+
     size_type
     m() const;
 

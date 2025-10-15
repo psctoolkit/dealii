@@ -61,7 +61,8 @@ namespace PSCToolkit
     amg_c_dprecsetc(psblas_preconditioner,
                     "SMOOTHER_TYPE",
                     additional_data.smoother_type);
-    // from the AMG4PSBLAS manual: if "SMOOTHER_TYPE" is set to
+
+    // From the AMG4PSBLAS manual: if "SMOOTHER_TYPE" is set to
     // "POLY", then "SMOOTHER_SWEEPS" is ignored and the
     // polynomial degree is used instead.
     if (std::strcmp(additional_data.smoother_type, "POLY") == 0)
@@ -142,7 +143,7 @@ namespace PSCToolkit
   void
   PreconditionAMG::Tvmult(Vector &dst, const Vector &src) const
   {
-    Assert((dst.size() == src.size()), ExcMessage("Dimension mismatch."));
+    AssertDimension(dst.size(), src.size());
     Assert(false, ExcNotImplemented());
   }
 

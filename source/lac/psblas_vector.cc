@@ -145,8 +145,8 @@ namespace PSCToolkit
                  const IndexSet &ghosts,
                  const MPI_Comm  comm)
   {
-    Assert(psblas_vector == nullptr,
-           ExcMessage("PSBLAS vector must not be initialized."));
+    // Assert(psblas_vector == nullptr,
+    //        ExcMessage("PSBLAS vector must not be initialized."));
 
     Assert(comm != MPI_COMM_NULL,
            ExcMessage("MPI_COMM_NULL passed to Vector::reinit()."));

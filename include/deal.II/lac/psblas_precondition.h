@@ -32,8 +32,8 @@ namespace PSCToolkit
    * This class implements an interface to the AMG4PSBLAS algebraic
    * multigrid preconditioner.
    *
-   * @note This class is only available if deal.II was configured with
-   * <tt>--with-psctoolkit</tt> and <tt>--with-amg4psblas</tt>.
+   * @note This class is only available if deal.II was configured with PSBLAS
+   * and AMG4PSBLAS.
    *
    */
 
@@ -44,8 +44,6 @@ namespace PSCToolkit
      * Declare the type for container size.
      */
     using size_type = dealii::types::global_dof_index;
-
-    using value_type = double;
 
     /**
      * Standardized data struct to pipe additional flags to the
@@ -60,10 +58,10 @@ namespace PSCToolkit
                      const char        *aggregation_type      = "SOC1",
                      const char        *smoother_type         = "FBGS",
                      const unsigned int smoother_sweeps       = 2,
-                     const unsigned int smoother_degree       = 2,
+                     const unsigned int smoother_degree       = 1,
                      const char        *aggr_prol             = "SMOOTHED",
                      const char        *coarse_type           = "BJAC",
-                     const char        *coarse_mat_type       = "REPL")
+                     const char        *coarse_mat_type       = "DIST")
         : cycle_type(cycle_type)
         , n_cycles(n_cycles)
         , aggregation_threshold(aggregation_threshold)
