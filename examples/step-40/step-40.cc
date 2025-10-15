@@ -17,6 +17,8 @@
  */
 
 
+#include <deal.II/base/init_finalize.h>
+#include <deal.II/base/mpi.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/timer.h>
@@ -25,6 +27,7 @@
 
 
 #define FORCE_USE_OF_PSBLAS
+// #define USE_DEAL_II_SOLVER
 
 
 #include <deal.II/lac/vector.h>
@@ -266,6 +269,7 @@ namespace Step40
     PSCToolkit::Vector completely_distributed_solution(locally_owned_dofs,
                                                        mpi_communicator);
 
+#  ifdef USE_DEAL_II_SOLVER
     SolverControl                solver_control(dof_handler.n_dofs(),
                                  1e-7 * system_rhs.l2_norm(),
                                  true,
@@ -273,13 +277,9 @@ namespace Step40
     SolverCG<PSCToolkit::Vector> solver(solver_control);
 
     typename PSCToolkit::PreconditionAMG::AdditionalData prec_data;
-    prec_data.cycle_type            = "VCYCLE";
-    prec_data.aggr_prol             = "SMOOTHED";
-    prec_data.smoother_sweeps       = 3;
-    prec_data.n_cycles              = 1;
-    prec_data.aggregation_threshold = 1e-2;
-    prec_data.smoother_type         = "JACOBI";
-    prec_data.coarse_type           = "ILU";
+    prec_data.cycle_type      = "VCYCLE";
+    prec_data.smoother_sweeps = 2;
+    prec_data.coarse_type     = "BJAC";
     PSCToolkit::PreconditionAMG preconditioner;
     preconditioner.initialize(system_matrix, prec_data);
 
@@ -290,6 +290,90 @@ namespace Step40
 
     pcout << "   Solved (with AMG4PSBLAS) in " << solver_control.last_step()
           << " iterations." << std::endl;
+#  else
+    char                ptype[40];
+    psb_c_SolverOptions options;
+    psb_c_descriptor   *cdh = system_matrix.get_psblas_descriptor();
+    double              t1, t2, eps, err;
+    double              one = 1.0, zero = 0.0, res2;
+    int                 info, iter, ret;
+    strcpy(ptype, "ML");
+
+    psb_c_ctxt  *cctxt = InitFinalize::get_psblas_context();
+    amg_c_dprec *ph    = amg_c_dprec_new();
+    amg_c_dprecinit(*cctxt, ph, ptype);
+    amg_c_dprecseti(ph, "SMOOTHER_SWEEPS", 2);
+    amg_c_dprecseti(ph, "SUB_FILLIN", 1);
+    amg_c_dprecsetc(ph, "COARSE_SOLVE", "BJAC");
+    amg_c_dprecsetc(ph, "COARSE_SUBSOLVE", "ILU");
+    amg_c_dprecseti(ph, "COARSE_FILLIN", 0);
+    if ((ret = amg_c_dhierarchy_build(system_matrix.get_psblas_matrix(),
+                                      system_matrix.get_psblas_descriptor(),
+                                      ph)) != 0)
+      fprintf(stderr, "From hierarchy_build: %d\n", ret);
+    if ((ret = amg_c_dsmoothers_build(system_matrix.get_psblas_matrix(),
+                                      system_matrix.get_psblas_descriptor(),
+                                      ph)) != 0)
+      fprintf(stderr, "From smoothers_build: %d\n", ret);
+
+    psb_c_barrier(*cctxt);
+    psb_c_DefaultSolverOptions(&options);
+    int istop      = 2;
+    int itmax      = 80;
+    int itrace     = 01;
+    int irst       = 20;
+    options.eps    = 1e-7; // 1.e-6;
+    options.itmax  = itmax;
+    options.irst   = irst;
+    options.itrace = 1;
+    options.istop  = istop;
+    psb_c_seterraction_ret();
+    t1   = psb_c_wtime();
+    ret  = amg_c_dkrylov("CG",
+                        system_matrix.get_psblas_matrix(),
+                        ph,
+                        system_rhs.get_psblas_vector(),
+                        completely_distributed_solution.get_psblas_vector(),
+                        cdh,
+                        &options);
+    t2   = psb_c_wtime();
+    iter = options.iter;
+    err  = options.err;
+    // fprintf(stderr,"From krylov: %d %lf, %d
+    // %d\n",iter,err,ret,psb_c_get_errstatus());
+    if (psb_c_get_errstatus() != 0)
+      {
+        psb_c_print_errmsg();
+      }
+    // fprintf(stderr,"After cleanup %d\n",psb_c_get_errstatus());
+    /* Check 2-norm of residual on exit */
+    psb_c_dvector *rh;
+    rh = psb_c_new_dvector();
+    psb_c_dgeall(rh, cdh);
+    if ((info = psb_c_dgeasb(rh, cdh)) != 0)
+      Assert(false, ExcInternalError());
+
+
+    psb_c_dgeaxpby(one, system_rhs.get_psblas_vector(), zero, rh, cdh);
+    psb_c_dspmm(-one,
+                system_matrix.get_psblas_matrix(),
+                completely_distributed_solution.get_psblas_vector(),
+                one,
+                rh,
+                cdh);
+    res2 = psb_c_dgenrm2(rh, cdh);
+
+    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+      {
+        fprintf(stdout, "Time: %lf\n", (t2 - t1));
+        fprintf(stdout, "Iter: %d\n", iter);
+        fprintf(stdout, "Err: %lg\n", err);
+        fprintf(stdout, "||r||_2: %lg\n", res2);
+      }
+
+
+#  endif
+
 
 #  ifndef FORCE_USE_OF_PSBLAS
     constraints.distribute(completely_distributed_solution);
@@ -448,7 +532,7 @@ int main(int argc, char *argv[])
       using namespace Step40;
 
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
-      // initlog(10);
+      initlog(10);
       LaplaceProblem<2> laplace_problem_2d;
       laplace_problem_2d.run();
     }
