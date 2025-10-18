@@ -34,6 +34,8 @@
 #include <deal.II/hp/mapping_collection.h>
 #include <deal.II/hp/q_collection.h>
 
+#include <deal.II/lac/psblas_vector.h>
+
 #include <deal.II/numerics/data_component_interpretation.h>
 #include <deal.II/numerics/data_postprocessor.h>
 

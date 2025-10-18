@@ -61,14 +61,14 @@ main(int argc, char **argv)
   PSCToolkit::Vector x(locally_owned_dofs, mpi_communicator);
 
   for (const types::global_dof_index idx : locally_owned_dofs)
-    x(idx) = idx;
-  x.compress();
+    x(idx) += idx;
+  x.compress(VectorOperation::add);
 
   PSCToolkit::Vector y;
   y.reinit(locally_owned_dofs, mpi_communicator);
   for (const types::global_dof_index idx : locally_owned_dofs)
-    y(idx) = idx + 0.5;
-  y.compress();
+    y(idx) += idx + 0.5;
+  y.compress(VectorOperation::add);
 
   // Test swap function
   double old_value = x(*locally_owned_dofs.begin());
@@ -86,13 +86,15 @@ main(int argc, char **argv)
     }
 
   // Test sadd()
+  x.reinit(locally_owned_dofs, mpi_communicator);
+  y.reinit(locally_owned_dofs, mpi_communicator);
   for (const types::global_dof_index idx : locally_owned_dofs)
     {
-      x(idx) = idx;
-      y(idx) = idx + 0.5;
+      x(idx) += idx;
+      y(idx) += idx + 0.5;
     }
-  x.compress();
-  y.compress();
+  x.compress(VectorOperation::add);
+  y.compress(VectorOperation::add);
 
   x.sadd(3.0, y);
   for (types::global_dof_index idx : locally_owned_dofs)
@@ -104,16 +106,18 @@ main(int argc, char **argv)
 
   // Test add_and_dot()
   PSCToolkit::Vector w;
+  x.reinit(locally_owned_dofs, mpi_communicator);
+  y.reinit(locally_owned_dofs, mpi_communicator);
   w.reinit(locally_owned_dofs, mpi_communicator);
   for (const types::global_dof_index idx : locally_owned_dofs)
     {
-      x(idx) = idx;
-      y(idx) = 1.;
-      w(idx) = idx + 1;
+      x(idx) += idx;
+      y(idx) += 1.;
+      w(idx) += idx + 1;
     }
-  x.compress();
-  y.compress();
-  w.compress();
+  x.compress(VectorOperation::add);
+  y.compress(VectorOperation::add);
+  w.compress(VectorOperation::add);
 
   const double dot_product = x.add_and_dot(1.0, y, w);
   Assert(dot_product - std::pow(w.l2_norm(), 2) < 1e-11,
@@ -128,7 +132,7 @@ main(int argc, char **argv)
 
   deallog << "Ok" << std::endl;
 
-  //   Test reinit(const Vector &v, const bool omit_zeroing_entries=false)
+  // Test reinit(const Vector &v, const bool omit_zeroing_entries=false)
   PSCToolkit::Vector z;
   z.reinit(x, true);
   for (const types::global_dof_index idx : locally_owned_dofs)

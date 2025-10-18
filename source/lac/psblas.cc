@@ -757,30 +757,32 @@ namespace PSCToolkit
                        psb_c_ctxt                *cctxt,
                        std::ofstream             &output_file)
     {
-      if (opt == nullptr)
-        {
-          deallog << "Error: null pointer passed to PrintSolverOptions."
-                  << std::endl;
-          return;
-        }
+      Assert(false, ExcNotImplemented());
+      // if (opt == nullptr)
+      //   {
+      //     deallog << "Error: null pointer passed to PrintSolverOptions."
+      //             << std::endl;
+      //     return;
+      //   }
 
-      int iam, nproc;
-      psb_c_info(*cctxt, &iam, &nproc);
-      if (iam == 0) // Only print from rank 0
-        {
-          output_file << "PSBLAS Solver Options:" << std::endl;
-          output_file << "  Maximum iterations (itmax): " << opt->itmax
-                      << std::endl;
-          output_file << "  Trace frequency (itrace): " << opt->itrace
-                      << std::endl;
-          output_file << "  Restart depth (irst): " << opt->irst << std::endl;
-          output_file << "  Stopping criterion (istop): " << opt->istop
-                      << std::endl;
-          output_file << "  Tolerance (eps): " << opt->eps << std::endl;
-          output_file << "  Iterations performed (iter): " << opt->iter
-                      << std::endl;
-          output_file << "  Final error (err): " << opt->err << std::endl;
-        }
+      // int iam, nproc;
+      // psb_c_info(*cctxt, &iam, &nproc);
+      // if (iam == 0) // Only print from rank 0
+      //   {
+      //     output_file << "PSBLAS Solver Options:" << std::endl;
+      //     output_file << "  Maximum iterations (itmax): " << opt->itmax
+      //                 << std::endl;
+      //     output_file << "  Trace frequency (itrace): " << opt->itrace
+      //                 << std::endl;
+      //     output_file << "  Restart depth (irst): " << opt->irst <<
+      //     std::endl; output_file << "  Stopping criterion (istop): " <<
+      //     opt->istop
+      //                 << std::endl;
+      //     output_file << "  Tolerance (eps): " << opt->eps << std::endl;
+      //     output_file << "  Iterations performed (iter): " << opt->iter
+      //                 << std::endl;
+      //     output_file << "  Final error (err): " << opt->err << std::endl;
+      //   }
     }
 
     /**

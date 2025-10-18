@@ -40,6 +40,7 @@
 #include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/lac/petsc_block_vector.h>
 #include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/psblas_vector.h>
 #include <deal.II/lac/trilinos_epetra_vector.h>
 #include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_tpetra_block_vector.h>
@@ -417,6 +418,41 @@ namespace FETools
     {
       DEAL_II_NOT_IMPLEMENTED();
     }
+#endif
+
+
+
+    // special version for PSBLAS
+#ifdef DEAL_II_WITH_PSBLAS
+    template <int dim, int spacedim>
+    void
+    back_interpolate(
+      const DoFHandler<dim, spacedim>                         &dof1,
+      const AffineConstraints<PSCToolkit::Vector::value_type> &constraints1,
+      const PSCToolkit::Vector                                &u1,
+      const DoFHandler<dim, spacedim>                         &dof2,
+      const AffineConstraints<PSCToolkit::Vector::value_type> &constraints2,
+      PSCToolkit::Vector                                      &u1_interpolated)
+    {
+      // if u1 is a parallel distributed PSCToolkit vector, we create a
+      // vector u2 with based on the sets of locally owned and relevant
+      // dofs of dof2
+      const IndexSet &dof2_locally_owned_dofs = dof2.locally_owned_dofs();
+      const IndexSet  dof2_locally_relevant_dofs =
+        DoFTools::extract_locally_relevant_dofs(dof2);
+
+      PSCToolkit::Vector u2_out(dof2_locally_owned_dofs,
+                                u1.get_mpi_communicator());
+      interpolate(dof1, u1, dof2, constraints2, u2_out);
+      PSCToolkit::Vector u2(dof2_locally_owned_dofs,
+                            dof2_locally_relevant_dofs,
+                            u1.get_mpi_communicator());
+      u2 = u2_out;
+      interpolate(dof2, u2, dof1, constraints1, u1_interpolated);
+    }
+
+
+
 #endif
 
 

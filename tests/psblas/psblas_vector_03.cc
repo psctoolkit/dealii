@@ -60,8 +60,8 @@ main(int argc, char **argv)
   PSCToolkit::Vector psblas_vector(locally_owned_dofs, mpi_communicator);
 
   for (const types::global_dof_index idx : locally_owned_dofs)
-    psblas_vector(idx) = idx;
-  psblas_vector.compress();
+    psblas_vector(idx) += idx;
+  psblas_vector.compress(VectorOperation::add);
 
   PSCToolkit::Vector test_ghosted;
   test_ghosted.reinit(locally_owned_dofs,

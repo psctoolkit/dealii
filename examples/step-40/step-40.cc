@@ -24,6 +24,8 @@
 #include <deal.II/base/timer.h>
 
 #include <deal.II/lac/generic_linear_algebra.h>
+#include <deal.II/lac/petsc_vector.h>
+#include <deal.II/numerics/vector_tools_interpolate.h>
 
 
 #define FORCE_USE_OF_PSBLAS
@@ -227,7 +229,17 @@ namespace Step40
 
           for (unsigned int q_point = 0; q_point < n_q_points; ++q_point)
             {
+#ifdef EASY_RHS
               const double rhs_value = 1.0;
+#else
+              const double rhs_value =
+                (fe_values.quadrature_point(q_point)[1] >
+                     0.5 +
+                       0.25 * std::sin(4.0 * numbers::PI *
+                                       fe_values.quadrature_point(q_point)[0]) ?
+                   1. :
+                   -1.);
+#endif
 
               for (unsigned int i = 0; i < dofs_per_cell; ++i)
                 {
@@ -251,7 +263,7 @@ namespace Step40
         }
 #ifdef FORCE_USE_OF_PSBLAS
     system_matrix.compress();
-    system_rhs.compress();
+    system_rhs.compress(VectorOperation::add);
 #else
     system_matrix.compress(VectorOperation::add);
     system_rhs.compress(VectorOperation::add);
@@ -375,11 +387,11 @@ namespace Step40
 #  endif
 
 
-#  ifndef FORCE_USE_OF_PSBLAS
+    // #  ifndef FORCE_USE_OF_PSBLAS
     constraints.distribute(completely_distributed_solution);
 
     locally_relevant_solution = completely_distributed_solution;
-#  endif
+    // #  endif
 
 #else
 
@@ -440,7 +452,6 @@ namespace Step40
   {
     TimerOutput::Scope t(computing_timer, "output");
 
-#ifndef FORCE_USE_OF_PSBLAS
     DataOut<dim> data_out;
     data_out.attach_dof_handler(dof_handler);
     data_out.add_data_vector(locally_relevant_solution, "u");
@@ -454,7 +465,6 @@ namespace Step40
 
     data_out.write_vtu_with_pvtu_record(
       "./", "solution", cycle, mpi_communicator, 2, 8);
-#endif
   }
 
 
@@ -532,7 +542,9 @@ int main(int argc, char *argv[])
       using namespace Step40;
 
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
+#ifdef FORCE_USE_OF_PSBLAS
       initlog(10);
+#endif
       LaplaceProblem<2> laplace_problem_2d;
       laplace_problem_2d.run();
     }

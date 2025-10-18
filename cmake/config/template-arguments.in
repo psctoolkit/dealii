@@ -92,7 +92,7 @@ DEAL_II_VEC_TEMPLATES := { Vector; BlockVector }
 // All vector types, based on real or complex scalars
 VECTOR_TYPES := {   Vector<double>;
                     Vector<float> ;
-
+                    PSCToolkit::Vector;
                     BlockVector<double>;
                     BlockVector<float>;
 
@@ -163,7 +163,7 @@ VECTOR_TYPES_WITH_PSBLAS := {   Vector<double>;
 // vectors if the PETScScalar data type is real-valued)
 REAL_VECTOR_TYPES  := {  Vector<double>;
                          Vector<float> ;
-
+                         PSCToolkit::Vector;
                          BlockVector<double>;
                          BlockVector<float>;
 

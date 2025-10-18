@@ -71,6 +71,13 @@ namespace PETScWrappers
 } // namespace PETScWrappers
 #  endif
 
+#  ifdef DEAL_II_WITH_PSBLAS
+namespace PSCToolkit
+{
+  class Vector;
+}
+#  endif
+
 #  ifdef DEAL_II_WITH_TRILINOS
 namespace TrilinosWrappers
 {
@@ -366,6 +373,37 @@ namespace LinearAlgebra
       import_elements(V, operation, communication_pattern);
     }
 #endif
+
+#ifdef DEAL_II_WITH_PSBLAS
+    /**
+     * Imports all the elements present in the vector's IndexSet from the input
+     * vector @p psblas_vec. VectorOperation::values @p operation is used to decide
+     * if the elements in @p V should be added to the current vector or replace
+     * the current elements. The last parameter can be used if the same
+     * communication pattern is used multiple times. This can be used to improve
+     * performance.
+     */
+    void
+    import_elements(
+      const PSCToolkit::Vector &psblas_vec,
+      VectorOperation::values   operation,
+      const std::shared_ptr<const Utilities::MPI::CommunicationPatternBase>
+        &communication_pattern = {});
+
+    /**
+     * @deprecated Use import_elements() instead.
+     */
+    DEAL_II_DEPRECATED
+    void
+    import(const PSCToolkit::Vector &V,
+           VectorOperation::values   operation,
+           const std::shared_ptr<const Utilities::MPI::CommunicationPatternBase>
+             &communication_pattern = {})
+    {
+      import_elements(V, operation, communication_pattern);
+    }
+#endif
+
 
 #ifdef DEAL_II_WITH_TRILINOS
     /**

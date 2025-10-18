@@ -11,14 +11,18 @@
 // LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
 // ------------------------------------------------------------------------
-#include "deal.II/base/types.h"
+
 #include <deal.II/base/exception_macros.h>
+#include <deal.II/base/exceptions.h>
 #include <deal.II/base/logstream.h>
+#include <deal.II/base/mpi.h>
+#include <deal.II/base/types.h>
 
 #include <deal.II/distributed/fully_distributed_tria.h>
 #include <deal.II/distributed/tria.h>
 
 #include <deal.II/dofs/dof_handler.h>
+#include <deal.II/dofs/dof_tools.h>
 
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_values.h>
@@ -26,9 +30,15 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
 
-#include <deal.II/lac/affine_constraints.h>
-#include <deal.II/lac/petsc_vector.h>
+#include "deal.II/lac/vector_operation.h"
+#include <deal.II/lac/precondition.h>
+#include <deal.II/lac/psblas_precondition.h>
+#include <deal.II/lac/psblas_sparse_matrix.h>
 #include <deal.II/lac/psblas_vector.h>
+#include <deal.II/lac/solver_cg.h>
+#include <deal.II/lac/solver_control.h>
+
+#include <deal.II/numerics/vector_tools.h>
 
 #include <psb_c_dbase.h>
 
@@ -38,77 +48,181 @@
 
 using namespace dealii;
 
-// Test reinit for non-ghosted and ghosted PSBLAS vectors.
+// Test AMG4PSBLAS preconditioner with CG solver.
 
 int main(int argc, char **argv)
 {
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
   MPI_Comm                         mpi_communicator = MPI_COMM_WORLD;
-
   // AssertThrow(Utilities::MPI::n_mpi_processes(mpi_communicator) == 2,
   //             ExcMessage("This test needs to be run with 2 MPI processes."));
 
-  MPILogInitAll log;
-  int           id;
-  MPI_Comm_rank(mpi_communicator, &id);
-  IndexSet locally_owned_dofs(25);
-  if (id == 0)
-    locally_owned_dofs.add_range(0, 15);
-  else if (id == 1)
-    locally_owned_dofs.add_range(15, 25);
+  initlog();
+
+  const unsigned int dim = 2;
+
+  // Create distributed triangulation of the unit square
+  Triangulation<dim, dim> tria_base;
+
+  // Create a serial triangulation (here by reading an external mesh):
+  GridGenerator::hyper_cube(tria_base, 0, 1);
+  tria_base.refine_global(7);
+
+  // Partition
+  GridTools::partition_triangulation(
+    Utilities::MPI::n_mpi_processes(mpi_communicator), tria_base);
+
+  // Create building blocks:
+  const TriangulationDescription::Description<dim, dim> description =
+    TriangulationDescription::Utilities::create_description_from_triangulation(
+      tria_base, mpi_communicator);
+
+  // Create a fully distributed triangulation:
+  parallel::fullydistributed::Triangulation<dim, dim> triangulation(
+    mpi_communicator);
+  triangulation.create_triangulation(description);
+
+  // Finite element and DoFHandler
+  FE_Q<dim>       fe(1);
+  DoFHandler<dim> dof_handler(triangulation);
+  dof_handler.distribute_dofs(fe);
+
+  IndexSet locally_owned_dofs = dof_handler.locally_owned_dofs();
+
+  IndexSet locally_relevant_dofs;
+  DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant_dofs);
+
+  AffineConstraints<double> constraints;
+  constraints.clear();
+  VectorTools::interpolate_boundary_values(dof_handler,
+                                           types::boundary_id(0),
+                                           Functions::ZeroFunction<dim>(),
+                                           constraints);
+
+  constraints.close();
+
+  PSCToolkit::SparseMatrix psblas_matrix;
+  psblas_matrix.reinit(locally_owned_dofs, mpi_communicator);
+  PSCToolkit::Vector psblas_rhs_vector(locally_owned_dofs, mpi_communicator);
+  DynamicSparsityPattern dsp(locally_relevant_dofs);
+
+  DoFTools::make_sparsity_pattern(dof_handler, dsp, constraints, false);
+  SparsityTools::distribute_sparsity_pattern(dsp,
+                                             locally_owned_dofs,
+                                             mpi_communicator,
+                                             locally_relevant_dofs);
+
+  QGauss<dim>   quadrature_formula(fe.degree + 1);
+  FEValues<dim> fe_values(fe,
+                          quadrature_formula,
+                          update_values | update_gradients |
+                            update_quadrature_points | update_JxW_values);
+
+  const unsigned int dofs_per_cell = fe.dofs_per_cell;
+  const unsigned int n_q_points    = quadrature_formula.size();
+
+  FullMatrix<double> cell_matrix(dofs_per_cell, dofs_per_cell);
+  Vector<double>     cell_rhs(dofs_per_cell);
+  std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
+
+  for (const auto &cell : dof_handler.active_cell_iterators())
+    {
+      if (cell->is_locally_owned())
+        {
+          fe_values.reinit(cell);
+
+          cell_matrix = 0.;
+          cell_rhs    = 0.;
+
+          for (unsigned int q_point = 0; q_point < n_q_points; ++q_point)
+            {
+              for (unsigned int i = 0; i < dofs_per_cell; ++i)
+                {
+                  for (unsigned int j = 0; j < dofs_per_cell; ++j)
+                    cell_matrix(i, j) += fe_values.shape_grad(i, q_point) *
+                                         fe_values.shape_grad(j, q_point) *
+                                         fe_values.JxW(q_point);
+
+                  cell_rhs(i) += 1. * fe_values.shape_value(i, q_point) *
+                                 fe_values.JxW(q_point);
+                }
+            }
+
+          cell->get_dof_indices(local_dof_indices);
+
+          constraints.distribute_local_to_global(cell_matrix,
+                                                 cell_rhs,
+                                                 local_dof_indices,
+                                                 psblas_matrix,
+                                                 psblas_rhs_vector);
+        }
+    }
+  psblas_matrix.compress();
+  psblas_rhs_vector.compress(VectorOperation::add);
+
+  SolverControl                solver_control(1000,
+                               1e-6 * psblas_rhs_vector.l2_norm(),
+                               false,
+                               false);
+  SolverCG<PSCToolkit::Vector> solver(solver_control);
+  PSCToolkit::Vector           solution(locally_owned_dofs, mpi_communicator);
 
 
-  IndexSet locally_relevant_dofs(25);
-  locally_relevant_dofs = locally_owned_dofs;
-  if (id == 0)
-    locally_relevant_dofs.add_range(15, 17);
-  else if (id == 1)
-    locally_relevant_dofs.add_range(12, 15);
+  // Test add() and mean_value() and scale()
+  PSCToolkit::Vector test_vector(locally_owned_dofs, mpi_communicator);
+  test_vector = 1.0;
+  // Test add
+  test_vector.add(1.0);
+  for (types::global_dof_index idx : locally_owned_dofs)
+    Assert(test_vector[idx] == 2.0, ExcMessage("Add operation failed."));
 
-  PSCToolkit::Vector psblas_vector(locally_owned_dofs, mpi_communicator);
+  std::cout << "Mean value: " << test_vector.mean_value() << std::endl;
+  PSCToolkit::Vector v;
+  v.reinit(locally_owned_dofs, mpi_communicator);
+  v = .5;
+  test_vector.scale(v);
+  for (types::global_dof_index idx : locally_owned_dofs)
+    Assert(test_vector[idx] == 1.0, ExcMessage("Scale() operation failed."));
 
-  for (const types::global_dof_index idx : locally_owned_dofs)
-    psblas_vector(idx) = idx;
-  psblas_vector.compress();
+  PSCToolkit::Vector v2;
+  v2.reinit(locally_owned_dofs, mpi_communicator);
+  v2 = 3.0;
+  test_vector.scale(v2);
+  for (types::global_dof_index idx : locally_owned_dofs)
+    std::cout << "Value at index " << idx << " : " << test_vector[idx]
+              << std::endl;
 
-  PSCToolkit::Vector test_ghosted;
-  test_ghosted.reinit(locally_owned_dofs,
-                      locally_relevant_dofs,
-                      mpi_communicator);
-  test_ghosted = psblas_vector; // lhs has ghost elements, rhs does not
+  // std::cout << "Mean value: " << test_vector.mean_value() << std::endl;
+  // test_vector.scale(2.0);
+  // std::cout << "After scaling: " << test_vector.mean_value() << std::endl;
 
-  AssertThrow(test_ghosted.l2_norm() == psblas_vector.l2_norm(),
-              ExcInternalError());
-  std::cout << "OK" << std::endl;
+  // solver.solve(psblas_matrix,
+  //              solution,
+  //              psblas_rhs_vector,
+  //              PreconditionIdentity());
 
+  // //  Use AMG preconditioner from PSBLAS
+  // PSCToolkit::Vector solution_amg;
+  // solution_amg.reinit(locally_owned_dofs, mpi_communicator);
+  // solution_amg = 0.;
+  // PSCToolkit::PreconditionAMG                          preconditioner;
+  // typename PSCToolkit::PreconditionAMG::AdditionalData prec_data;
+  // prec_data.cycle_type  = "VCYCLE";
+  // prec_data.aggr_prol   = "SMOOTHED";
+  // prec_data.n_cycles    = 1;
+  // prec_data.coarse_type = "ILU";
+  // preconditioner.initialize(psblas_matrix, prec_data);
 
-  // Now let's test the case where the left hand side has a different size (like
-  // 0)
-  PSCToolkit::Vector test_empty;
-  test_empty = psblas_vector;
-  AssertThrow(test_empty.size() == psblas_vector.size(), ExcInternalError());
-  AssertThrow(test_empty.l2_norm() == psblas_vector.l2_norm(),
-              ExcInternalError());
-  std::cout << "OK" << std::endl;
+  // check_solver_within_range(solver.solve(psblas_matrix,
+  //                                        solution_amg,
+  //                                        psblas_rhs_vector,
+  //                                        preconditioner),
+  //                           solver_control.last_step(),
+  //                           5,
+  //                           10);
 
-  std::cout << test_ghosted(*locally_owned_dofs.begin()) << std::endl;
-
-
-  // PETScWrappers::MPI::Vector petsc_vector, petsc_ghost;
-  // petsc_vector.reinit(locally_owned_dofs, mpi_communicator);
-  // for (const types::global_dof_index idx : locally_owned_dofs)
-  //   petsc_vector(idx) = idx;
-  // petsc_vector.compress(VectorOperation::insert);
-
-
-  // petsc_ghost.reinit(locally_owned_dofs,
-  //                    locally_relevant_dofs,
-  //                    mpi_communicator);
-  // petsc_ghost = petsc_vector; // lhs has ghost elements, rhs does not
-  // for (const types::global_dof_index idx : locally_owned_dofs)
-  //   AssertThrow(petsc_ghost(idx) == petsc_vector(idx), ExcInternalError());
-
-
+  // solution_amg -= solution;
+  // Assert(solution_amg.l2_norm() < 1e-6, ExcMessage("Error too large."));
 
   return 0;
 }

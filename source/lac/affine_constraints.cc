@@ -12,6 +12,7 @@
 //
 // ------------------------------------------------------------------------
 
+#include "deal.II/lac/psblas_vector.h"
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/affine_constraints.templates.h>
 
@@ -153,6 +154,11 @@ dealii::AffineConstraints<double>::distribute<
   const;
 #    endif
 #  endif
+#endif
+
+#ifdef DEAL_II_WITH_PSBLAS
+template void
+dealii::AffineConstraints<double>::distribute(PSCToolkit::Vector &) const;
 #endif
 
 #ifndef DOXYGEN

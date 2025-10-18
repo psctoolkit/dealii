@@ -37,6 +37,10 @@
 #  include <Epetra_Import.h>
 #endif
 
+#ifdef DEAL_II_WITH_PSBLAS
+#  include <deal.II/lac/psblas_vector.h>
+#endif
+
 #include <boost/io/ios_state.hpp>
 
 DEAL_II_NAMESPACE_OPEN
@@ -498,6 +502,28 @@ namespace LinearAlgebra
     // restore the representation of the vector
     ierr = VecRestoreArrayRead(static_cast<const Vec &>(petsc_vec), &start_ptr);
     AssertThrow(ierr == 0, ExcPETScError(ierr));
+  }
+#endif
+
+
+
+#ifdef DEAL_II_WITH_PSBLAS
+  template <typename Number>
+  void
+  ReadWriteVector<Number>::import_elements(
+    const PSCToolkit::Vector &psblas_vec,
+    VectorOperation::values /*operation*/,
+    const std::shared_ptr<const Utilities::MPI::CommunicationPatternBase>
+      & /*communication_pattern*/)
+  {
+    // TODO: this works only if no communication is needed.
+    Assert(psblas_vec.locally_owned_elements() == stored_elements,
+           StandardExceptions::ExcInvalidState());
+
+    // get a pointer to the underlying
+    const PSCToolkit::Vector::value_type *start_ptr = psblas_vec.begin();
+    const size_type vec_size = psblas_vec.locally_owned_size();
+    std::copy(start_ptr, start_ptr + vec_size, begin());
   }
 #endif
 

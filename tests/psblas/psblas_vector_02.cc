@@ -64,8 +64,8 @@ main(int argc, char **argv)
   PSCToolkit::Vector psblas_vector(locally_owned_dofs, mpi_communicator);
 
   for (const types::global_dof_index idx : locally_owned_dofs)
-    psblas_vector(idx) = idx;
-  psblas_vector.compress();
+    psblas_vector(idx) += idx;
+  psblas_vector.compress(VectorOperation::add);
 
   PSCToolkit::Vector test_ghosted;
   test_ghosted.reinit(locally_owned_dofs,
@@ -84,13 +84,19 @@ main(int argc, char **argv)
       ++idx;
     }
 
+  // let's clear the vector, using operator= when the vector is empty
+  test_ghosted.clear();
+  AssertThrow(test_ghosted.size() == 0, ExcInternalError());
+  test_ghosted = psblas_vector;
+
   AssertThrow(test_ghosted.l1_norm() - psblas_vector.l1_norm() < 1e-15,
               ExcMessage("Norms do not match!"));
   AssertThrow(test_ghosted.l2_norm() - psblas_vector.l2_norm() < 1e-15,
               ExcMessage("Norms do not match!"));
   AssertThrow(test_ghosted.linfty_norm() - psblas_vector.linfty_norm() < 1e-15,
               ExcMessage("Norms do not match!"));
-  // Test clear() and size()
+
+  // Test size()
   psblas_vector.clear();
   AssertThrow(psblas_vector.size() == 0, ExcInternalError());
   deallog << "OK" << std::endl;
