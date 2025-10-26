@@ -168,7 +168,6 @@ namespace PSCToolkit
     ghost_indices.subtract_set(local_partitioning);
 
     int err;
-    std::cout << "Vector has to be rebuilt: " << is_vector_changed << std::endl;
     if (psblas_descriptor.get() == nullptr || is_vector_changed == true)
       {
         psblas_descriptor = std::shared_ptr<psb_c_descriptor>(
