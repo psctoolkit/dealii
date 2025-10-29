@@ -437,8 +437,8 @@ namespace Benchmark
                   for (unsigned int j = 0; j < dofs_per_cell; ++j)
                     cell_matrix(i, j) +=
                       fe_values.shape_grad(i, q_point) *
-                      // (dim == 2 ? conductivity_values[q_point] :
-                      //             unit_symmetric_tensor<dim>()) *
+                      (dim == 2 ? conductivity_values[q_point] :
+                                  unit_symmetric_tensor<dim>()) *
                       fe_values.shape_grad(j, q_point) * fe_values.JxW(q_point);
 
                   cell_rhs(i) += rhs_values[q_point] *
