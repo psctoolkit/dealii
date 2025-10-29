@@ -59,6 +59,12 @@ namespace PSCToolkit
                     "AGGR_PROL",
                     additional_data.aggr_prol);
     amg_c_dprecsetc(psblas_preconditioner,
+                    "AGGR_FILTER",
+                    additional_data.aggr_filter);
+    amg_c_dprecsetc(psblas_preconditioner,
+                    "PAR_AGGR_ALG",
+                    additional_data.parallel_aggr_algorithm);
+    amg_c_dprecsetc(psblas_preconditioner,
                     "SMOOTHER_TYPE",
                     additional_data.smoother_type);
 
@@ -76,9 +82,6 @@ namespace PSCToolkit
     amg_c_dprecsetc(psblas_preconditioner,
                     "COARSE_SOLVE",
                     additional_data.coarse_type);
-    amg_c_dprecsetc(psblas_preconditioner,
-                    "SMOOTHER_TYPE",
-                    additional_data.coarse_mat_type);
 
     // build AMG hierarchy
     err = amg_c_dhierarchy_build(matrix.psblas_sparse_matrix,
@@ -94,6 +97,9 @@ namespace PSCToolkit
     AssertThrow(err == 0,
                 ExcMessage("Error " + std::to_string(err) +
                            " while building AMG smoothers."));
+
+    if (additional_data.output_details == true)
+      err = amg_c_ddescr(psblas_preconditioner);
   }
 
 

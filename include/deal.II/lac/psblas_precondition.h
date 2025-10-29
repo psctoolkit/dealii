@@ -52,16 +52,19 @@ namespace PSCToolkit
      */
     struct AdditionalData
     {
-      AdditionalData(const char        *cycle_type            = "VCYCLE",
-                     const unsigned int n_cycles              = 1,
-                     const double       aggregation_threshold = 1e-2,
-                     const char        *aggregation_type      = "SOC1",
-                     const char        *smoother_type         = "FBGS",
-                     const unsigned int smoother_sweeps       = 2,
-                     const unsigned int smoother_degree       = 1,
-                     const char        *aggr_prol             = "SMOOTHED",
-                     const char        *coarse_type           = "BJAC",
-                     const char        *coarse_mat_type       = "DIST")
+      AdditionalData(const char        *cycle_type              = "VCYCLE",
+                     const unsigned int n_cycles                = 1,
+                     const double       aggregation_threshold   = 1e-2,
+                     const char        *aggregation_type        = "SOC1",
+                     const char        *smoother_type           = "FBGS",
+                     const unsigned int smoother_sweeps         = 2,
+                     const unsigned int smoother_degree         = 1,
+                     const char        *aggr_prol               = "SMOOTHED",
+                     const char        *aggr_filter             = "FILTER",
+                     const char        *parallel_aggr_algorithm = "DECOUPLED",
+                     const char        *coarse_type             = "BJAC",
+                     const char        *coarse_mat_type         = "DIST",
+                     const bool         output_details          = false)
         : cycle_type(cycle_type)
         , n_cycles(n_cycles)
         , aggregation_threshold(aggregation_threshold)
@@ -70,8 +73,11 @@ namespace PSCToolkit
         , smoother_sweeps(smoother_sweeps)
         , smoother_degree(smoother_degree)
         , aggr_prol(aggr_prol)
+        , aggr_filter(aggr_filter)
+        , parallel_aggr_algorithm(parallel_aggr_algorithm)
         , coarse_type(coarse_type)
         , coarse_mat_type(coarse_mat_type)
+        , output_details(output_details)
       {}
 
 
@@ -95,7 +101,7 @@ namespace PSCToolkit
        * Type of aggregation algorithm. Possible values are "SOC1", "SOC2",
        * "MATCHBOXP".
        */
-      char *aggregation_type;
+      const char *aggregation_type;
 
       /**
        * Type of smoother used in the multilevel preconditioner.
@@ -122,6 +128,18 @@ namespace PSCToolkit
       const char *aggr_prol;
 
       /**
+       * Matrix used in computing the smoothed prolongator: filtered or
+       * unfiltered.
+       */
+      const char *aggr_filter;
+
+      /**
+       * Parallel aggregation algorithm. Possible values are "DECOUPLED" and
+       * "COUPLED".
+       */
+      const char *parallel_aggr_algorithm;
+
+      /**
        * Solver used at the coarsest level. See AMG4PSBLAS documentation for
        * possible values.
        */
@@ -132,6 +150,12 @@ namespace PSCToolkit
        * each one.
        */
       const char *coarse_mat_type;
+
+      /**
+       * Setting this flag to true produces debug output from PSBLAS, when the
+       * preconditioner is constructed.
+       */
+      bool output_details;
     };
 
     /**

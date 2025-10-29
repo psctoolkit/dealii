@@ -15,6 +15,7 @@
  */
 
 
+#include <deal.II/base/exception_macros.h>
 #include <deal.II/base/init_finalize.h>
 #include <deal.II/base/patterns.h>
 #include <deal.II/base/quadrature_lib.h>
@@ -92,9 +93,7 @@ namespace Benchmark
   public:
     ConductivityTensor()
       : TensorFunction<2, dim>()
-    {
-      static_assert(dim == 2);
-    }
+    {}
 
     virtual void value_list(const std::vector<Point<dim>> &points,
                             std::vector<Tensor<2, dim>> &values) const override;
@@ -108,6 +107,7 @@ namespace Benchmark
                                       std::vector<Tensor<2, dim>> &values) const
   {
     (void)points;
+    AssertDimension(dim, 2); // make sure we call this only in 2D
     AssertDimension(points.size(), values.size());
 
     Tensor<2, dim> K;
@@ -127,29 +127,75 @@ namespace Benchmark
   struct AMGParameters
   {
     std::string  cycle_type;
+    unsigned int n_cycles;
+    std::string  smoother_type;
+    std::string  aggregation_type;
+    double       aggregation_threshold;
+    std::string  parallel_aggregation_algorithm;
+    std::string  prolongator_aggregation;
+    std::string  aggregation_filter;
     unsigned int smoother_sweeps;
     std::string  coarse_solver;
     std::string  coarse_subsolver;
+    std::string  coarse_mat_type;
+    bool         verbose_amg_info;
 
     void declare_parameters(ParameterHandler &param)
     {
       param.declare_entry("Cycle type",
                           "VCYCLE",
-                          Patterns::Selection("VCYCLE|W-CYCLE"));
+                          Patterns::Selection("VCYCLE|WCYCLE"));
+      param.declare_entry("Number of cycles", "1", Patterns::Integer());
+      param.declare_entry("Smoother type",
+                          "FBGS",
+                          Patterns::Selection("FBGS|JACOBI|BJAC|L1-JACOBI"));
       param.declare_entry("Smoother sweeps", "2", Patterns::Integer());
-      param.declare_entry("Coarse solver", "BJAC", Patterns::Selection("BJAC"));
+      param.declare_entry("Aggregation type",
+                          "SOC1",
+                          Patterns::Selection("SOC1|SOC2|MATCHBOXP"));
+      param.declare_entry("Aggregation threshold", "1e-2", Patterns::Double());
+      param.declare_entry("Prolongator aggregation",
+                          "SMOOTHED",
+                          Patterns::Selection("SMOOTHED|UNSMOOTHED"));
+      param.declare_entry("Aggregation filter",
+                          "FILTER",
+                          Patterns::Selection("FILTER|NOFILTER"));
+      param.declare_entry("Parallel aggregation algorithm",
+                          "DECOUPLED",
+                          Patterns::Selection("DECOUPLED|COUPLED"));
+      param.declare_entry("Coarse solver",
+                          "BJAC",
+                          Patterns::Selection("BJAC|ILU|MUMPS|UMF|SLUDIST"));
       param.declare_entry("Coarse subsolver",
                           "ILU",
                           Patterns::Selection("ILU"),
                           "Type of solver used on the coarse level of the AMG");
+      param.declare_entry("Coarse matrix type",
+                          "DIST",
+                          Patterns::Selection("DIST|REPL"));
+      param.declare_entry("Verbose AMG info",
+                          "false",
+                          Patterns::Bool(),
+                          "Whether to print detailed information during the "
+                          "AMG setup and solve phases.");
     }
 
     void parse_parameters(ParameterHandler &param)
     {
-      cycle_type       = param.get("Cycle type");
-      smoother_sweeps  = param.get_integer("Smoother sweeps");
-      coarse_solver    = param.get("Coarse solver");
-      coarse_subsolver = param.get("Coarse subsolver");
+      cycle_type              = param.get("Cycle type");
+      n_cycles                = param.get_integer("Number of cycles");
+      smoother_type           = param.get("Smoother type");
+      smoother_sweeps         = param.get_integer("Smoother sweeps");
+      aggregation_type        = param.get("Aggregation type");
+      prolongator_aggregation = param.get("Prolongator aggregation");
+      aggregation_filter      = param.get("Aggregation filter");
+      parallel_aggregation_algorithm =
+        param.get("Parallel aggregation algorithm");
+      aggregation_threshold = param.get_double("Aggregation threshold");
+      coarse_solver         = param.get("Coarse solver");
+      coarse_subsolver      = param.get("Coarse subsolver");
+      coarse_mat_type       = param.get("Coarse matrix type");
+      verbose_amg_info      = param.get_bool("Verbose AMG info");
     }
   };
 
@@ -372,8 +418,12 @@ namespace Benchmark
           cell_matrix = 0.;
           cell_rhs    = 0.;
 
-          conductivity_tensor.value_list(fe_values.get_quadrature_points(),
-                                         conductivity_values);
+          if constexpr (dim == 2)
+            {
+              conductivity_tensor.value_list(fe_values.get_quadrature_points(),
+                                             conductivity_values);
+            }
+
           rhs_function.value_list(fe_values.get_quadrature_points(),
                                   rhs_values);
 
@@ -382,10 +432,11 @@ namespace Benchmark
               for (unsigned int i = 0; i < dofs_per_cell; ++i)
                 {
                   for (unsigned int j = 0; j < dofs_per_cell; ++j)
-                    cell_matrix(i, j) += fe_values.shape_grad(i, q_point) *
-                                         conductivity_values[q_point] *
-                                         fe_values.shape_grad(j, q_point) *
-                                         fe_values.JxW(q_point);
+                    cell_matrix(i, j) +=
+                      fe_values.shape_grad(i, q_point) *
+                      (dim == 2 ? conductivity_values[q_point] :
+                                  unit_symmetric_tensor<dim>()) *
+                      fe_values.shape_grad(j, q_point) * fe_values.JxW(q_point);
 
                   cell_rhs(i) += rhs_values[q_point] *
                                  fe_values.shape_value(i, q_point) *
@@ -425,9 +476,18 @@ namespace Benchmark
         SolverCG<PSCToolkit::Vector> solver(solver_parameters);
 
         typename PSCToolkit::PreconditionAMG::AdditionalData prec_data;
-        prec_data.cycle_type      = AMG_control.cycle_type.c_str();
-        prec_data.smoother_sweeps = AMG_control.smoother_sweeps;
-        prec_data.coarse_type     = AMG_control.coarse_solver.c_str();
+        prec_data.cycle_type            = AMG_control.cycle_type.c_str();
+        prec_data.smoother_type         = AMG_control.smoother_type.c_str();
+        prec_data.smoother_sweeps       = AMG_control.smoother_sweeps;
+        prec_data.coarse_type           = AMG_control.coarse_solver.c_str();
+        prec_data.coarse_mat_type       = AMG_control.coarse_mat_type.c_str();
+        prec_data.output_details        = AMG_control.verbose_amg_info;
+        prec_data.aggregation_type      = AMG_control.aggregation_type.c_str();
+        prec_data.aggregation_threshold = AMG_control.aggregation_threshold;
+        prec_data.aggr_prol   = AMG_control.prolongator_aggregation.c_str();
+        prec_data.aggr_filter = AMG_control.aggregation_filter.c_str();
+        prec_data.parallel_aggr_algorithm =
+          AMG_control.parallel_aggregation_algorithm.c_str();
         PSCToolkit::PreconditionAMG preconditioner;
         preconditioner.initialize(system_matrix, prec_data);
 
@@ -452,13 +512,31 @@ namespace Benchmark
         psb_c_ctxt  *cctxt = InitFinalize::get_psblas_context();
         amg_c_dprec *ph    = amg_c_dprec_new();
         amg_c_dprecinit(*cctxt, ph, ptype);
+
+        amg_c_dprecsetc(ph, "ML_CYCLE", AMG_control.cycle_type.c_str());
+        // smoothers
+        amg_c_dprecsetc(ph, "SMOOTHER_TYPE", AMG_control.smoother_type.c_str());
         amg_c_dprecseti(ph, "SMOOTHER_SWEEPS", AMG_control.smoother_sweeps);
-        amg_c_dprecseti(ph, "SUB_FILLIN", 1);
-        amg_c_dprecsetc(ph, "COARSE_SOLVE", AMG_control.coarse_solver.c_str());
+        amg_c_dprecseti(ph, "CYCLE_SWEEPS", AMG_control.n_cycles);
+
+        // aggregation parameters
+        amg_c_dprecsetr(ph, "AGGR_THRSH", AMG_control.aggregation_threshold);
+        amg_c_dprecsetc(ph, "AGGR_TYPE", AMG_control.aggregation_type.c_str());
         amg_c_dprecsetc(ph,
-                        "COARSE_SUBSOLVE",
-                        AMG_control.coarse_subsolver.c_str());
-        amg_c_dprecseti(ph, "COARSE_FILLIN", 0);
+                        "PAR_AGGR_ALG",
+                        AMG_control.parallel_aggregation_algorithm.c_str());
+        amg_c_dprecsetc(ph,
+                        "AGGR_PROL",
+                        AMG_control.prolongator_aggregation.c_str());
+        amg_c_dprecsetc(ph,
+                        "AGGR_FILTER",
+                        AMG_control.aggregation_filter.c_str());
+
+        // coarse solvers
+
+        amg_c_dprecsetc(ph, "COARSE_SOLVE", AMG_control.coarse_solver.c_str());
+        amg_c_dprecsetc(ph, "COARSE_MAT", AMG_control.coarse_mat_type.c_str());
+
         if ((ret = amg_c_dhierarchy_build(system_matrix.get_psblas_matrix(),
                                           system_matrix.get_psblas_descriptor(),
                                           ph)) != 0)
@@ -477,6 +555,10 @@ namespace Benchmark
         options.itrace = solver_parameters.log_history() ? 1 : 0;
         options.istop  = istop; // scaled 2-norm of the residual
         psb_c_seterraction_ret();
+
+        if (AMG_control.verbose_amg_info == true)
+          amg_c_ddescr(ph);
+
         t1   = psb_c_wtime();
         ret  = amg_c_dkrylov("CG",
                             system_matrix.get_psblas_matrix(),
@@ -488,13 +570,17 @@ namespace Benchmark
         t2   = psb_c_wtime();
         iter = options.iter;
         err  = options.err;
-        // fprintf(stderr,"From krylov: %d %lf, %d
-        // %d\n",iter,err,ret,psb_c_get_errstatus());
+        // fprintf(stderr,
+        //         "From krylov: %d %lf, %d%d\n",
+        //         iter,
+        //         err,
+        //         ret,
+        //         psb_c_get_errstatus());
         if (psb_c_get_errstatus() != 0)
           {
             psb_c_print_errmsg();
           }
-        // fprintf(stderr,"After cleanup %d\n",psb_c_get_errstatus());
+
         /* Check 2-norm of residual on exit */
         psb_c_dvector *rh;
         rh = psb_c_new_dvector();
@@ -631,7 +717,13 @@ namespace Benchmark
 
         if (cycle == 0)
           {
-            GridGenerator::hyper_cube(triangulation);
+            if constexpr (dim == 2)
+              GridGenerator::hyper_cube(triangulation, -1, 1, true);
+            else if constexpr (dim == 3)
+              GridGenerator::hyper_cube(triangulation, 0, 1, true);
+            else
+              DEAL_II_ASSERT_UNREACHABLE();
+
             triangulation.refine_global(5);
           }
         else
@@ -662,7 +754,7 @@ int main(int argc, char *argv[])
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
 
       LaplaceProblem<2>::Parameters parameters;
-      LaplaceProblem<2>             laplace_problem_2d(parameters);
+      LaplaceProblem<2>             laplace_problem(parameters);
 
       std::string parameter_file;
       if (argc > 1)
@@ -672,7 +764,7 @@ int main(int argc, char *argv[])
 
       ParameterAcceptor::initialize(parameter_file, "used_parameters.prm");
 
-      laplace_problem_2d.run();
+      laplace_problem.run();
     }
   catch (std::exception &exc)
     {
