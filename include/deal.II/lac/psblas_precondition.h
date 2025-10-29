@@ -56,6 +56,7 @@ namespace PSCToolkit
                      const unsigned int n_cycles                = 1,
                      const double       aggregation_threshold   = 1e-2,
                      const char        *aggregation_type        = "SOC1",
+                     const unsigned int aggregation_size        = 8,
                      const char        *smoother_type           = "FBGS",
                      const unsigned int smoother_sweeps         = 2,
                      const unsigned int smoother_degree         = 1,
@@ -69,6 +70,7 @@ namespace PSCToolkit
         , n_cycles(n_cycles)
         , aggregation_threshold(aggregation_threshold)
         , aggregation_type(strdup(aggregation_type))
+        , aggregation_size(aggregation_size)
         , smoother_type(smoother_type)
         , smoother_sweeps(smoother_sweeps)
         , smoother_degree(smoother_degree)
@@ -102,6 +104,8 @@ namespace PSCToolkit
        * "MATCHBOXP".
        */
       const char *aggregation_type;
+
+      unsigned int aggregation_size;
 
       /**
        * Type of smoother used in the multilevel preconditioner.

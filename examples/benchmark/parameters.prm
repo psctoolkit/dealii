@@ -1,18 +1,19 @@
 subsection Laplace Problem<2>
   set Dirichlet boundary ids      = 0, 1, 2, 3
-  set Number of refinement cycles = 10
+  set Number of refinement cycles = 8
   set Perform adaptive refinement = true
-  set Use deal.II solver          = true
+  set Use deal.II solver          = false
   set Verbosity level             = 10
   subsection AMG control
     set Aggregation filter             = FILTER
     set Aggregation threshold          = 1e-2
     set Aggregation type               = SOC1
+    set Aggregation size               = 8 #used **only if**COUPLED and MATCHBOXP
     set Coarse matrix type             = DIST
     set Coarse solver                  = MUMPS #Type of solver used on the coarse level of the AMG
     set Cycle type                     = VCYCLE
     set Number of cycles               = 1
-    set Parallel aggregation algorithm = COUPLED #DECOUPLED
+    set Parallel aggregation algorithm = DECOUPLED
     set Prolongator aggregation        = SMOOTHED
     set Smoother sweeps                = 1
     set Smoother type                  = FBGS

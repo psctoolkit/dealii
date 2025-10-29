@@ -53,17 +53,20 @@ namespace PSCToolkit
                     "AGGR_THRSH",
                     additional_data.aggregation_threshold);
     amg_c_dprecsetc(psblas_preconditioner,
+                    "PAR_AGGR_ALG",
+                    additional_data.parallel_aggr_algorithm);
+    amg_c_dprecsetc(psblas_preconditioner,
                     "AGGR_TYPE",
                     additional_data.aggregation_type);
+    amg_c_dprecseti(psblas_preconditioner,
+                    "AGGR_SIZE",
+                    additional_data.aggregation_size);
     amg_c_dprecsetc(psblas_preconditioner,
                     "AGGR_PROL",
                     additional_data.aggr_prol);
     amg_c_dprecsetc(psblas_preconditioner,
                     "AGGR_FILTER",
                     additional_data.aggr_filter);
-    amg_c_dprecsetc(psblas_preconditioner,
-                    "PAR_AGGR_ALG",
-                    additional_data.parallel_aggr_algorithm);
     amg_c_dprecsetc(psblas_preconditioner,
                     "SMOOTHER_TYPE",
                     additional_data.smoother_type);

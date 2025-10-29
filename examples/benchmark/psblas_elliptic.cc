@@ -130,6 +130,7 @@ namespace Benchmark
     unsigned int n_cycles;
     std::string  smoother_type;
     std::string  aggregation_type;
+    unsigned int aggregation_size;
     double       aggregation_threshold;
     std::string  parallel_aggregation_algorithm;
     std::string  prolongator_aggregation;
@@ -153,6 +154,7 @@ namespace Benchmark
       param.declare_entry("Aggregation type",
                           "SOC1",
                           Patterns::Selection("SOC1|SOC2|MATCHBOXP"));
+      param.declare_entry("Aggregation size", "4", Patterns::Integer());
       param.declare_entry("Aggregation threshold", "1e-2", Patterns::Double());
       param.declare_entry("Prolongator aggregation",
                           "SMOOTHED",
@@ -187,6 +189,7 @@ namespace Benchmark
       smoother_type           = param.get("Smoother type");
       smoother_sweeps         = param.get_integer("Smoother sweeps");
       aggregation_type        = param.get("Aggregation type");
+      aggregation_size        = param.get_integer("Aggregation size");
       prolongator_aggregation = param.get("Prolongator aggregation");
       aggregation_filter      = param.get("Aggregation filter");
       parallel_aggregation_algorithm =
@@ -434,8 +437,8 @@ namespace Benchmark
                   for (unsigned int j = 0; j < dofs_per_cell; ++j)
                     cell_matrix(i, j) +=
                       fe_values.shape_grad(i, q_point) *
-                      (dim == 2 ? conductivity_values[q_point] :
-                                  unit_symmetric_tensor<dim>()) *
+                      // (dim == 2 ? conductivity_values[q_point] :
+                      //             unit_symmetric_tensor<dim>()) *
                       fe_values.shape_grad(j, q_point) * fe_values.JxW(q_point);
 
                   cell_rhs(i) += rhs_values[q_point] *
@@ -483,6 +486,7 @@ namespace Benchmark
         prec_data.coarse_mat_type       = AMG_control.coarse_mat_type.c_str();
         prec_data.output_details        = AMG_control.verbose_amg_info;
         prec_data.aggregation_type      = AMG_control.aggregation_type.c_str();
+        prec_data.aggregation_size      = AMG_control.aggregation_size;
         prec_data.aggregation_threshold = AMG_control.aggregation_threshold;
         prec_data.aggr_prol   = AMG_control.prolongator_aggregation.c_str();
         prec_data.aggr_filter = AMG_control.aggregation_filter.c_str();
@@ -521,10 +525,11 @@ namespace Benchmark
 
         // aggregation parameters
         amg_c_dprecsetr(ph, "AGGR_THRSH", AMG_control.aggregation_threshold);
-        amg_c_dprecsetc(ph, "AGGR_TYPE", AMG_control.aggregation_type.c_str());
         amg_c_dprecsetc(ph,
                         "PAR_AGGR_ALG",
                         AMG_control.parallel_aggregation_algorithm.c_str());
+        amg_c_dprecsetc(ph, "AGGR_TYPE", AMG_control.aggregation_type.c_str());
+        amg_c_dprecseti(ph, "AGGR_SIZE", AMG_control.aggregation_size);
         amg_c_dprecsetc(ph,
                         "AGGR_PROL",
                         AMG_control.prolongator_aggregation.c_str());
