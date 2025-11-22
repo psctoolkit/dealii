@@ -13,6 +13,7 @@
 // ------------------------------------------------------------------------
 
 
+#include "deal.II/base/exception_macros.h"
 #include <deal.II/base/memory_consumption.h>
 #include <deal.II/base/mpi.h>
 
@@ -135,7 +136,10 @@ namespace PSCToolkitWrappers
     // Create a new PSBLAS vector and allocate mem space for vector
     psblas_vector = psb_c_new_dvector();
 
-    ierr = psb_c_dgeall_remote(psblas_vector, psblas_descriptor.get());
+    ierr = psb_c_dgeall_remote_options(psblas_vector,
+                                       psblas_descriptor.get(),
+                                       psb_matbld_remote_,
+                                       psb_dupl_add_);
     Assert(ierr == 0, ExcInitializePSBLASVector(ierr));
 
     if (omit_zeroing_entries == false)
@@ -235,7 +239,12 @@ namespace PSCToolkitWrappers
       }
     // ... create and finalize vector
     psblas_vector = psb_c_new_dvector();
-    ierr          = psb_c_dgeall_remote(psblas_vector, psblas_descriptor.get());
+    // ierr          = psb_c_dgeall_remote(psblas_vector,
+    // psblas_descriptor.get());
+    ierr = psb_c_dgeall_remote_options(psblas_vector,
+                                       psblas_descriptor.get(),
+                                       psb_matbld_remote_,
+                                       psb_dupl_add_);
 
     // ...and descriptor
     ierr = psb_c_cdasb(psblas_descriptor.get());
@@ -679,7 +688,7 @@ namespace PSCToolkitWrappers
                       "elements and consequently is read-only. It does "
                       "not make sense to call compress() for such "
                       "vectors."));
-    AssertThrow(operation == VectorOperation::values::add, ExcNotImplemented());
+
     // We check the state of the vector...
     Assert(state != internal::State::Default, ExcInvalidDefault());
     // ... and if the last action was compatible with what we want to do
@@ -697,7 +706,16 @@ namespace PSCToolkitWrappers
       }
 
     // finally, we perform the assemble operation
-    ierr = psb_c_dgeasb(psblas_vector, psblas_descriptor.get());
+    if (operation == VectorOperation::add)
+      ierr = psb_c_dgeasb_options(psblas_vector,
+                                  psblas_descriptor.get(),
+                                  psb_dupl_add_);
+    else if (operation == VectorOperation::insert)
+      ierr = psb_c_dgeasb_options(psblas_vector,
+                                  psblas_descriptor.get(),
+                                  psb_dupl_ovwrt_);
+    else
+      DEAL_II_NOT_IMPLEMENTED();
 
     Assert(ierr == 0, ExcAssemblePSBLASVector(ierr));
     state       = internal::State::Assembled;
