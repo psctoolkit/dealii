@@ -12,7 +12,7 @@
 //
 // ------------------------------------------------------------------------
 
-for (VEC : REAL_VECTOR_TYPES)
+for (VEC : VECTORS_WITHOUT_LAVEC)
   {
     template class NOXSolver<VEC>;
   }
