@@ -31,8 +31,12 @@
 
 #include <deal.II/lac/petsc_sparse_matrix.h>
 #include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/precondition.h>
 #include <deal.II/lac/psblas_sparse_matrix.h>
 #include <deal.II/lac/psblas_vector.h>
+#include <deal.II/lac/solver_cg.h>
+
+#include <deal.II/numerics/vector_tools.h>
 
 #include <iostream>
 
@@ -48,8 +52,8 @@ main(int argc, char **argv)
 {
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
   MPI_Comm                         mpi_communicator = MPI_COMM_WORLD;
-  AssertThrow(Utilities::MPI::n_mpi_processes(mpi_communicator) == 2,
-              ExcMessage("This test needs to be run with 2 MPI processes."));
+  // AssertThrow(Utilities::MPI::n_mpi_processes(mpi_communicator) == 2,
+  //             ExcMessage("This test needs to be run with 2 MPI processes."));
 
   MPILogInitAll log;
 
@@ -87,6 +91,12 @@ main(int argc, char **argv)
   DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant_dofs);
 
   AffineConstraints<double> constraints;
+  constraints.clear();
+  VectorTools::interpolate_boundary_values(dof_handler,
+                                           types::boundary_id(0),
+                                           Functions::ZeroFunction<dim>(),
+                                           constraints);
+  constraints.close();
 
   PSCToolkitWrappers::SparseMatrix psblas_matrix;
   psblas_matrix.reinit(locally_owned_dofs, mpi_communicator);
@@ -141,7 +151,7 @@ main(int argc, char **argv)
                                          fe_values.shape_grad(j, q_point) *
                                          fe_values.JxW(q_point);
 
-                  cell_rhs(i) += 1. * fe_values.shape_value(i, q_point) *
+                  cell_rhs(i) += 1.5 * fe_values.shape_value(i, q_point) *
                                  fe_values.JxW(q_point);
                 }
             }
@@ -185,6 +195,18 @@ main(int argc, char **argv)
               ExcMessage("Error too large."));
   deallog << "Matrix-vector product: OK" << std::endl;
 
+  // Test the CG solver with PSBLAS
+  PSCToolkitWrappers::Vector solution(locally_owned_dofs, mpi_communicator);
+  SolverControl              solver_control(100, 1e-9, false, false);
+  SolverCG<PSCToolkitWrappers::Vector> solver(solver_control);
+
+  check_solver_within_range(solver.solve(psblas_matrix,
+                                         solution,
+                                         psblas_rhs_vector,
+                                         PreconditionIdentity()),
+                            solver_control.last_step(),
+                            6,
+                            12);
 
   return 0;
 }

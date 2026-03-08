@@ -1,5 +1,7 @@
 
 DEAL:0::Matrix-vector product: OK
+DEAL:0::Solver stopped within 6 - 12 iterations
 
 DEAL:1::Matrix-vector product: OK
+DEAL:1::Solver stopped within 6 - 12 iterations
 

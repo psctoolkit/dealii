@@ -16,6 +16,7 @@
 
 #include <deal.II/base/config.h>
 
+#include "deal.II/base/exception_macros.h"
 #include <deal.II/base/partitioner.h>
 
 #include <deal.II/lac/exceptions.h>
@@ -28,6 +29,10 @@
 #ifdef DEAL_II_WITH_PETSC
 #  include <deal.II/lac/petsc_block_vector.h>
 #  include <deal.II/lac/petsc_vector.h>
+#endif
+
+#ifdef DEAL_II_WITH_PSBLAS
+#  include <deal.II/lac/psblas_vector.h>
 #endif
 
 #ifdef DEAL_II_WITH_TRILINOS
@@ -563,6 +568,57 @@ namespace LinearAlgebra
     const VectorOperation::values          operation)
   {
     internal::import_elements_from_block_vector(*this, src, operation);
+  }
+#endif
+
+
+
+#ifdef DEAL_II_WITH_PSBLAS
+  template <typename Number>
+  void
+  ReadWriteVector<Number>::import_elements(
+    const PSCToolkitWrappers::Vector &psblas_vec,
+    VectorOperation::values           operation,
+    const std::shared_ptr<const Utilities::MPI::CommunicationPatternBase>
+      &communication_pattern)
+  {
+    // Create or use the provided communication pattern
+    std::shared_ptr<const Utilities::MPI::Partitioner> comm_pattern;
+    if (communication_pattern.get() == nullptr)
+      {
+        // Create a new communication pattern based on PSBLAS vector's
+        // parallel partitioning
+        comm_pattern = std::make_shared<Utilities::MPI::Partitioner>(
+          psblas_vec.locally_owned_elements(),
+          get_stored_elements(),
+          psblas_vec.get_mpi_communicator());
+      }
+    else
+      {
+        comm_pattern =
+          std::dynamic_pointer_cast<const Utilities::MPI::Partitioner>(
+            communication_pattern);
+        AssertThrow(comm_pattern != nullptr,
+                    ExcMessage("The communication pattern is not of type "
+                               "Utilities::MPI::Partitioner."));
+      }
+
+    const unsigned int n_owned = comm_pattern->locally_owned_size();
+    AssertDimension(n_owned, psblas_vec.locally_owned_size());
+
+    // PSBLAS vectors provides direct access to locally owned values via
+    // begin()/end() iterators (contiguous data)
+    const double *start_ptr = psblas_vec.begin();
+
+    // Copy locally owned values to temporary buffer for MPI exchange
+    std::vector<Number> owned_values(n_owned);
+    std::copy(start_ptr, start_ptr + n_owned, owned_values.data());
+
+    // Do the actual MPI exchange + apply operation into *this*
+    internal::import_elements<::dealii::MemorySpace::Host>(comm_pattern,
+                                                           owned_values.data(),
+                                                           operation,
+                                                           *this);
   }
 #endif
 

@@ -25,6 +25,7 @@
 
 #include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/psblas_vector.h>
 #include <deal.II/lac/trilinos_vector.h>
 
 #include <functional>

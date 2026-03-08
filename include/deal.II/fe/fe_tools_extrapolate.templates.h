@@ -37,6 +37,7 @@
 #include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/lac/petsc_block_vector.h>
 #include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/psblas_vector.h>
 #include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_tpetra_block_vector.h>
 #include <deal.II/lac/trilinos_tpetra_vector.h>
@@ -1559,6 +1560,23 @@ namespace FETools
       vector.reinit(locally_owned_dofs, parallel_tria->get_mpi_communicator());
     }
 #endif // DEAL_II_WITH_PETSC
+
+#ifdef DEAL_II_WITH_PSBLAS
+    template <int dim, int spacedim>
+    void
+    reinit_distributed(const DoFHandler<dim, spacedim> &dh,
+                       PSCToolkitWrappers::Vector      &vector)
+    {
+      const parallel::distributed::Triangulation<dim, spacedim> *parallel_tria =
+        dynamic_cast<
+          const parallel::distributed::Triangulation<dim, spacedim> *>(
+          &dh.get_triangulation());
+      Assert(parallel_tria != nullptr, ExcNotImplemented());
+
+      const IndexSet &locally_owned_dofs = dh.locally_owned_dofs();
+      vector.reinit(locally_owned_dofs, parallel_tria->get_mpi_communicator());
+    }
+#endif // DEAL_II_WITH_PSBLAS
 
 #ifdef DEAL_II_WITH_TRILINOS
     template <int dim, int spacedim>
