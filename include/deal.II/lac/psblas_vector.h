@@ -565,6 +565,15 @@ namespace PSCToolkitWrappers
     add(const value_type s, const Vector &V);
 
     /**
+     * Addition of two scaled vectors, i.e. <tt>*this += a*V + b*W</tt>.
+     */
+    void
+    add(const value_type a,
+        const Vector    &V,
+        const value_type b,
+        const Vector    &W);
+
+    /**
      * Addition of <tt>s</tt> to all components.
      */
     void
@@ -652,10 +661,7 @@ namespace PSCToolkitWrappers
     operator+=(const Vector &v);
 
     /**
-     * Set all components of the vector to the given number @p s. Simply pass
-     * this down to the individual block objects, but we still need to declare
-     * this function to make the example given in the discussion about making
-     * the constructor explicit work.
+     * Set all components of the vector to the given number @p s.
      *
      *
      * Since the semantics of assigning a scalar to a vector are not
@@ -665,6 +671,12 @@ namespace PSCToolkitWrappers
      */
     Vector &
     operator=(const value_type s);
+
+    /**
+     * Multiply all components of the vector by the given number @p s.
+     */
+    Vector &
+    operator*=(const value_type s);
 
     /**
      * Return an index set that describes which elements of this vector are

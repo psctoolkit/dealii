@@ -128,6 +128,10 @@ namespace PSCToolkitWrappers
 
         // Free the vl array
         Assert(ierr == 0, ExcInitializePSBLASDescriptor(ierr));
+
+        // Assemble the descriptor
+        ierr = psb_c_cdasb(psblas_descriptor.get());
+        Assert(ierr == 0, ExcAssemblePSBLASDescriptor(ierr));
       }
 
     // Create a new PSBLAS vector and allocate mem space for vector
@@ -256,7 +260,6 @@ namespace PSCToolkitWrappers
   void
   Vector::reinit(const Vector &v, const bool omit_zeroing_entries)
   {
-    psblas_descriptor = v.psblas_descriptor;
     if (v.has_ghost_elements())
       {
         reinit(v.locally_owned_elements(),
@@ -271,9 +274,46 @@ namespace PSCToolkitWrappers
       }
     else
       {
-        reinit(v.owned_elements,
-               v.get_mpi_communicator(),
-               omit_zeroing_entries);
+        // Free old vector if it exists, before replacing the descriptor
+        int ierr;
+        if (state != internal::State::Default && psblas_vector != nullptr)
+          {
+            ierr = psb_c_dgefree(psblas_vector, psblas_descriptor.get());
+            Assert(ierr == 0, ExcFreePSBLASVector(ierr));
+            psblas_vector = nullptr;
+          }
+
+        // Copy parallel layout
+        communicator   = v.get_mpi_communicator();
+        ghosted        = false;
+        owned_elements = v.owned_elements;
+        psblas_context = v.psblas_context;
+
+        // Share the descriptor — do NOT call reinit(IndexSet,...) which
+        // would overwrite this with a brand new descriptor
+        psblas_descriptor = v.psblas_descriptor;
+
+        // Allocate a new vector against the shared descriptor
+        psblas_vector = psb_c_new_dvector();
+        ierr          = psb_c_dgeall_remote_options(psblas_vector,
+                                           psblas_descriptor.get(),
+                                           PSB_MATBLD_REMOTE,
+                                           PSB_DUPL_DEF);
+        Assert(ierr == 0, ExcInitializePSBLASVector(ierr));
+
+        // Assemble the vector
+        ierr = psb_c_dgeasb(psblas_vector, psblas_descriptor.get());
+        Assert(ierr == 0, ExcMessage("Error assembling PSBLAS vector."));
+
+        if (!omit_zeroing_entries)
+          {
+            ierr = psb_c_dvect_set_scal(psblas_vector, 0.0);
+            Assert(ierr == 0,
+                   ExcCallingPSBLASFunction(ierr, "psb_c_dvect_set_scal"));
+          }
+
+        state       = internal::State::Assembled;
+        last_action = VectorOperation::unknown;
       }
   }
 
@@ -323,6 +363,22 @@ namespace PSCToolkitWrappers
     Assert(state != internal::State::Default, ExcInvalidState(state));
     int ierr = psb_c_dvect_set_scal(psblas_vector, s);
     Assert(ierr == 0, ExcCallingPSBLASFunction(ierr, "psb_c_dvect_set_scal"));
+    return *this;
+  }
+
+
+
+  Vector &
+  Vector::operator*=(const value_type s)
+  {
+    AssertIsFinite(s);
+    Assert(state != internal::State::Default, ExcInvalidState(state));
+    const value_type *start_ptr = psb_c_dvect_f_get_pnt(psblas_vector);
+    const value_type *end_ptr   = start_ptr + locally_owned_size();
+
+    for (const value_type *ptr = start_ptr; ptr != end_ptr; ++ptr)
+      const_cast<value_type &>(*ptr) *= s;
+
     return *this;
   }
 
@@ -582,6 +638,26 @@ namespace PSCToolkitWrappers
                               psblas_vector,
                               psblas_descriptor.get());
     Assert(ierr == 0, ExcAXPBY(ierr));
+  }
+
+
+
+  void
+  Vector::add(const value_type a,
+              const Vector    &V,
+              const value_type b,
+              const Vector    &W)
+  {
+    Assert(!has_ghost_elements(), ExcGhostsPresent());
+    AssertIsFinite(a);
+    AssertIsFinite(b);
+    AssertDimension(size(), V.size());
+    AssertDimension(size(), W.size());
+
+    // First add a*V to this vector
+    add(a, V);
+    // Then add b*W to this vector
+    add(b, W);
   }
 
 
