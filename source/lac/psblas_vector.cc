@@ -16,6 +16,8 @@
 
 #include <deal.II/lac/psblas_vector.h>
 
+#include <psb_types.h>
+
 #ifdef DEAL_II_WITH_PSBLAS
 #  include <psb_base_cbind.h>
 #  include <psb_c_base.h>
@@ -302,10 +304,15 @@ namespace PSCToolkitWrappers
           reinit(v.owned_elements, v.get_mpi_communicator(), true);
       }
 
-    int ierr = psb_c_dvect_clone(v.psblas_vector, psblas_vector);
-    AssertThrow(ierr == 0, ExcAXPBY(ierr));
 
-    // If current vector has ghost elements, update them
+    int err = psb_c_dvect_reinit(psblas_vector, true);
+    Assert(err == 0, ExcCallingPSBLASFunction(err, "psb_c_dvect_reinit"));
+    value_type *start_ptr = psb_c_dvect_f_get_pnt(psblas_vector);
+    value_type *other     = psb_c_dvect_f_get_pnt(v.psblas_vector);
+    for (unsigned int i = 0; i < locally_owned_size(); ++i)
+      start_ptr[i] = other[i];
+
+    // If destination has ghost elements, update them from owners
     if (has_ghost_elements())
       update_ghost_values();
 
@@ -503,37 +510,49 @@ namespace PSCToolkitWrappers
   }
 
 
+
+  void
+  Vector::do_set_add_operation(const size_type   n_elements,
+                               const size_type  *indices,
+                               const value_type *values,
+                               const bool        add_values)
+  {
+    const VectorOperation::values action =
+      (add_values ? VectorOperation::add : VectorOperation::insert);
+    Assert((last_action == action) || (last_action == VectorOperation::unknown),
+           ExcWrongMode(action, last_action));
+    Assert(!has_ghost_elements(), ExcGhostsPresent());
+
+    std::vector<psb_l_t> psblas_indices(n_elements);
+    for (size_type i = 0; i < n_elements; ++i)
+      {
+        const auto index = static_cast<value_type>(indices[i]);
+        AssertIntegerConversion(index, indices[i]);
+        psblas_indices[i] = index;
+      }
+
+    // insertion mode
+    const psb_i_t mode = (add_values ? PSB_ADD_VALUES : PSB_INSERT_VALUES);
+    int           err  = psb_c_dgeins_v(n_elements,
+                             psblas_indices.data(),
+                             values,
+                             psblas_vector,
+                             psblas_descriptor.get(),
+                             mode);
+    AssertThrow(err == 0, ExcCallingPSBLASFunction(err, "psb_c_dgeins_v"));
+
+    last_action = action;
+  }
+
+
+
   void
   Vector::set(const std::vector<Vector::size_type>  &indices,
               const std::vector<Vector::value_type> &values)
   {
-    Assert(!has_ghost_elements(), ExcGhostsPresent());
-    Assert(state != internal::State::Default, ExcInvalidState(state));
-    AssertDimension(indices.size(), values.size());
-
-    psb_i_t nz = indices.size(); // Number of non-zero entries
-
-    // Allocate memory for row indices and values. We need to subtract the
-    // current value in order to set the value.
-    std::vector<psb_l_t> irw(nz);
-    std::vector<psb_d_t> val(nz);
-    for (psb_i_t i = 0; i < nz; ++i)
-      {
-        const auto psblas_index = static_cast<psb_l_t>(indices[i]);
-        AssertIntegerConversion(psblas_index, indices[i]);
-        irw[i] = psblas_index;
-        val[i] = values[i] -
-                 psb_c_dgetelem(psblas_vector, irw[i], psblas_descriptor.get());
-      }
-
-    int ierr = psb_c_dgeins(nz /*nz*/,
-                            irw.data(),
-                            val.data(),
-                            psblas_vector,
-                            psblas_descriptor.get());
-
-    // Free allocated memory
-    Assert(ierr == 0, ExcInsertionInPSBLASVector(ierr));
+    Assert(indices.size() == values.size(),
+           ExcMessage("Function called with arguments of different sizes"));
+    do_set_add_operation(indices.size(), indices.data(), values.data(), false);
   }
 
 
@@ -542,31 +561,9 @@ namespace PSCToolkitWrappers
   Vector::add(const std::vector<Vector::size_type>  &indices,
               const std::vector<Vector::value_type> &values)
   {
-    Assert(!has_ghost_elements(), ExcGhostsPresent());
-    Assert(state != internal::State::Default, ExcInvalidState(state));
     Assert(indices.size() == values.size(),
-           ExcMessage("Indices and values size mismatch."));
-
-    psb_i_t nz = indices.size(); // Number of non-zero entries
-
-    // Allocate memory for row indices and values
-    std::vector<psb_l_t> irw(nz);
-    std::vector<psb_d_t> val(nz);
-    for (psb_i_t i = 0; i < nz; ++i)
-      {
-        const auto psblas_index = static_cast<psb_l_t>(indices[i]);
-        AssertIntegerConversion(psblas_index, indices[i]);
-        irw[i] = psblas_index;
-        val[i] = values[i];
-      }
-
-    int ierr = psb_c_dgeins(nz /*nz*/,
-                            irw.data(),
-                            val.data(),
-                            psblas_vector,
-                            psblas_descriptor.get());
-
-    Assert(ierr == 0, ExcInsertionInPSBLASVector(ierr));
+           ExcMessage("Function called with arguments of different sizes"));
+    do_set_add_operation(indices.size(), indices.data(), values.data(), true);
   }
 
 
@@ -701,16 +698,7 @@ namespace PSCToolkitWrappers
       }
 
     // finally, we perform the assemble operation
-    if (operation == VectorOperation::add)
-      ierr = psb_c_dgeasb_options(psblas_vector,
-                                  psblas_descriptor.get(),
-                                  PSB_DUPL_ADD);
-    else if (operation == VectorOperation::insert)
-      ierr = psb_c_dgeasb_options(psblas_vector,
-                                  psblas_descriptor.get(),
-                                  PSB_DUPL_DEF);
-    else
-      DEAL_II_NOT_IMPLEMENTED();
+    ierr = psb_c_dgeasb(psblas_vector, psblas_descriptor.get());
 
     Assert(ierr == 0, ExcAssemblePSBLASVector(ierr));
     state       = internal::State::Assembled;

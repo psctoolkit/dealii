@@ -64,12 +64,6 @@ namespace PSCToolkitWrappers
       operator=(const value_type &s) const
       {
         Assert(!vector.has_ghost_elements(), ExcGhostsPresent());
-        Assert(
-          vector.owned_elements.is_element(index),
-          ExcMessage(
-            "You are trying to write to an element of the vector that is not "
-            "locally owned. This is not allowed for the current interface to"
-            " PSBLAS vectors."));
 
         // Make sure the operation is consistent with the last one
         Assert(vector.last_action == VectorOperation::insert ||
@@ -725,6 +719,18 @@ namespace PSCToolkitWrappers
      * write or an add operation.
      */
     VectorOperation::values last_action;
+
+    /**
+     * Collective set or add operation: This function is invoked by the
+     * collective @p set and @p add with the @p add_values flag set to the
+     * corresponding value.
+     */
+    void
+    do_set_add_operation(const size_type   n_elements,
+                         const size_type  *indices,
+                         const value_type *values,
+                         const bool        add_values);
+
 
     friend class SparseMatrix;
   };
