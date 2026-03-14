@@ -49,14 +49,6 @@ main(int argc, char **argv)
   else if (id == 1)
     locally_owned_dofs.add_range(15, 25);
 
-
-  IndexSet locally_relevant_dofs(25);
-  locally_relevant_dofs = locally_owned_dofs;
-  if (id == 0)
-    locally_relevant_dofs.add_range(15, 17);
-  else if (id == 1)
-    locally_relevant_dofs.add_range(12, 15);
-
   PSCToolkitWrappers::Vector psblas_vector(locally_owned_dofs,
                                            mpi_communicator);
 

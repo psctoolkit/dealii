@@ -1,0 +1,3 @@
+
+DEAL::Test switching insertion mode (local): OK
+DEAL::Test switching insertion mode (with remote relevant dofs): OK
