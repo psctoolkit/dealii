@@ -83,11 +83,15 @@ test(MPI_Comm mpi_communicator)
   AffineConstraints<double> constraints;
 
   // PSBLAS matrix and vectors
-  PSCToolkitWrappers::SparseMatrix psblas_matrix;
-  psblas_matrix.reinit(locally_owned_dofs, mpi_communicator);
+  PSCToolkitWrappers::SparseMatrix                   psblas_matrix;
+  typename dealii::PSCToolkitWrappers::StorageFormat storage;
+  storage.backend = dealii::PSCToolkitWrappers::StorageFormat::Backend::CPU;
+  storage.format  = "CSR";
+  psblas_matrix.reinit(locally_owned_dofs, mpi_communicator, storage);
 
   PSCToolkitWrappers::Vector psblas_rhs_vector(locally_owned_dofs,
-                                               mpi_communicator);
+                                               mpi_communicator,
+                                               storage);
 
   //  PETSc matrix and vector
   PETScWrappers::MPI::Vector petsc_test_vector;

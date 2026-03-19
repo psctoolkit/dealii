@@ -27,13 +27,16 @@ DEAL_II_NAMESPACE_OPEN
 namespace PSCToolkitWrappers
 {
   // SparsityPattern
-  SparsityPattern::SparsityPattern(const IndexSet &index_set,
-                                   const MPI_Comm  communicator)
+  SparsityPattern::SparsityPattern(const IndexSet      &index_set,
+                                   const MPI_Comm       communicator,
+                                   const StorageFormat &fmt)
   {
     SparsityPatternBase::resize(index_set.size(), index_set.size());
 
     Assert(communicator != MPI_COMM_NULL,
            ExcMessage("MPI_COMM_NULL passed to SparseMatrix::reinit()."));
+
+    storage_format = fmt;
 
     psblas_descriptor.reset(
       psb_c_new_descriptor(),
@@ -119,7 +122,9 @@ namespace PSCToolkitWrappers
     int err = -1;
     if (!psb_c_cd_is_asb(psblas_descriptor.get()))
       {
-        err = psb_c_cdasb(psblas_descriptor.get());
+        err =
+          psb_c_cdasb_format(psblas_descriptor.get(),
+                             storage_format.to_psblas_vect_string().c_str());
         Assert(err == 0, ExcMessage("Error while finalizing SparsityPattern."));
       }
   }

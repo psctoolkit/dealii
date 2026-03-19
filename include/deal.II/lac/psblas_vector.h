@@ -223,8 +223,9 @@ namespace PSCToolkitWrappers
      * Construct a new parallel PSBLAS vector without ghost elements from an
      * IndexSet.
      */
-    explicit Vector(const IndexSet &local_partitioning,
-                    const MPI_Comm  communicator);
+    explicit Vector(const IndexSet      &local_partitioning,
+                    const MPI_Comm       communicator,
+                    const StorageFormat &storage_format = {});
 
     /**
      * Construct a new parallel ghosted PSBLAS vector from IndexSets.
@@ -235,9 +236,10 @@ namespace PSCToolkitWrappers
      * @see
      * @ref GlossGhostedVector "vectors with ghost elements"
      */
-    Vector(const IndexSet &local_partitioning,
-           const IndexSet &ghost_indices,
-           const MPI_Comm  communicator);
+    Vector(const IndexSet      &local_partitioning,
+           const IndexSet      &ghost_indices,
+           const MPI_Comm       communicator,
+           const StorageFormat &storage_format = {});
 
     /**
      * Destructor. Internally, its frees the PSBLAS vector and descriptor.
@@ -253,9 +255,10 @@ namespace PSCToolkitWrappers
      * @ref GlossGhostedVector "vectors with ghost elements"
      */
     void
-    reinit(const IndexSet &local_partitioning,
-           const MPI_Comm  communicator,
-           const bool      omit_zeroing_entries = false);
+    reinit(const IndexSet      &local_partitioning,
+           const MPI_Comm       communicator,
+           const bool           omit_zeroing_entries = false,
+           const StorageFormat &storage_format       = {});
 
     /**
      * Change the dimension to that of the vector @p v, and also take over
@@ -281,9 +284,10 @@ namespace PSCToolkitWrappers
      * read-only.
      */
     void
-    reinit(const IndexSet &local_partitioning,
-           const IndexSet &ghost_indices,
-           const MPI_Comm  communicator);
+    reinit(const IndexSet      &local_partitioning,
+           const IndexSet      &ghost_indices,
+           const MPI_Comm       communicator,
+           const StorageFormat &storage_format = {});
 
 
     /**
@@ -719,6 +723,12 @@ namespace PSCToolkitWrappers
      * write or an add operation.
      */
     VectorOperation::values last_action;
+
+    /**
+     * Stores the storage backend and optional format of this vector.
+     * The default is StorageFormat::Backend::CPU.
+     */
+    StorageFormat storage_format;
 
     /**
      * Collective set or add operation: This function is invoked by the

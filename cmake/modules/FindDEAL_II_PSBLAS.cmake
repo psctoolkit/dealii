@@ -26,7 +26,7 @@
 set(PSBLAS_DIR "" CACHE PATH "An optional hint to a PSBLAS installation containing the PSBLAS include directory and libraries")
 set_if_empty(PSBLAS_DIR "$ENV{PSBLAS_DIR}")
 
-set(_psblas_libs "psb_base;psb_cbind;psb_linsolve;psb_prec;psb_util")
+set(_psblas_libs "psb_base;psb_cbind;psb_linsolve;psb_prec;psb_ext;psb_util")
 set(_psblas_library_variables "")
 
 foreach(_lib ${_psblas_libs})
@@ -44,6 +44,87 @@ deal_ii_find_path(PSBLAS_INCLUDE_DIR psb_c_base.h
   HINTS ${PSBLAS_DIR}
   PATH_SUFFIXES include
   )
+
+#
+# Check for optional CUDA support in PSBLAS (libpsb_cuda)
+#
+set(_psblas_cuda_library_variables "")
+set(PSBLAS_WITH_CUDA FALSE)
+set(PSBLAS_PSBLASCONFIG_H "${PSBLAS_INCLUDE_DIR}/psb_config.h")
+if(EXISTS ${PSBLAS_PSBLASCONFIG_H})
+  file(STRINGS "${PSBLAS_PSBLASCONFIG_H}" _psb_have_cuda
+    REGEX "^#[ \t]*define[ \t]+PSB_HAVE_CUDA")
+  if(_psb_have_cuda)
+    set(PSBLAS_WITH_CUDA TRUE)
+    deal_ii_find_library(PSBLAS_CUDA_LIBRARY
+      NAMES psb_cuda
+      HINTS ${PSBLAS_DIR}
+      PATH_SUFFIXES lib${LIB_SUFFIX} lib64 lib
+    )
+    list(APPEND _psblas_cuda_library_variables PSBLAS_CUDA_LIBRARY)
+
+    #
+    # libpsb_cuda.a contains device code and requires CUDA runtime libraries.
+    # Use CUDAToolkit if available (CMake >= 3.17), otherwise fall back to
+    # find_library searches in standard CUDA paths.
+    #
+    find_package(CUDAToolkit QUIET)
+    if(CUDAToolkit_FOUND)
+      deal_ii_find_library(PSBLAS_CUDART_LIBRARY
+        NAMES cudart
+        HINTS ${CUDAToolkit_LIBRARY_DIR}
+        PATH_SUFFIXES lib${LIB_SUFFIX} lib64 lib
+      )
+    else()
+      deal_ii_find_library(PSBLAS_CUDART_LIBRARY
+        NAMES cudart
+        HINTS /usr/local/cuda
+        PATH_SUFFIXES targets/x86_64-linux/lib lib${LIB_SUFFIX} lib64 lib
+      )
+    endif()
+    list(APPEND _psblas_cuda_library_variables PSBLAS_CUDART_LIBRARY)
+
+    # libculibos is required when linking a static CUDA library into a shared lib
+    deal_ii_find_library(PSBLAS_CULIBOS_LIBRARY
+      NAMES culibos
+      HINTS ${CUDAToolkit_LIBRARY_DIR} /usr/local/cuda
+      PATH_SUFFIXES targets/x86_64-linux/lib lib${LIB_SUFFIX} lib64 lib
+    )
+    list(APPEND _psblas_cuda_library_variables PSBLAS_CULIBOS_LIBRARY)
+
+    # libpsb_cuda.a calls cuBLAS routines (cublasDgemv_v2, etc.)
+    if(CUDAToolkit_FOUND)
+      deal_ii_find_library(PSBLAS_CUBLAS_LIBRARY
+        NAMES cublas
+        HINTS ${CUDAToolkit_LIBRARY_DIR}
+        PATH_SUFFIXES lib${LIB_SUFFIX} lib64 lib
+      )
+    else()
+      deal_ii_find_library(PSBLAS_CUBLAS_LIBRARY
+        NAMES cublas
+        HINTS /usr/local/cuda
+        PATH_SUFFIXES targets/x86_64-linux/lib lib${LIB_SUFFIX} lib64 lib
+      )
+    endif()
+    list(APPEND _psblas_cuda_library_variables PSBLAS_CUBLAS_LIBRARY)
+
+    # libpsb_cuda.a also calls cuSPARSE routines (cusparseCreate, cusparseSpMV, etc.)
+    if(CUDAToolkit_FOUND)
+      deal_ii_find_library(PSBLAS_CUSPARSE_LIBRARY
+        NAMES cusparse
+        HINTS ${CUDAToolkit_LIBRARY_DIR}
+        PATH_SUFFIXES lib${LIB_SUFFIX} lib64 lib
+      )
+    else()
+      deal_ii_find_library(PSBLAS_CUSPARSE_LIBRARY
+        NAMES cusparse
+        HINTS /usr/local/cuda
+        PATH_SUFFIXES targets/x86_64-linux/lib lib${LIB_SUFFIX} lib64 lib
+      )
+    endif()
+    list(APPEND _psblas_cuda_library_variables PSBLAS_CUSPARSE_LIBRARY)
+  endif()
+endif()
 
 set(PSBLAS_PSBLASVERSION_H "${PSBLAS_INCLUDE_DIR}/psb_config.h")
 if(EXISTS ${PSBLAS_PSBLASVERSION_H})
@@ -85,6 +166,7 @@ process_feature(PSBLAS
       ${_additional_libraries}
       LAPACK_LIBRARIES
     OPTIONAL
+      ${_psblas_cuda_library_variables}
       MPI_CXX_LIBRARIES
       MPI_Fortran_LIBRARIES
   INCLUDE_DIRS 
@@ -92,5 +174,5 @@ process_feature(PSBLAS
   LINKER_FLAGS
     REQUIRED ${_interface_lapack} ${_interface_blas}
   CLEAR
-    ${_psblas_library_variables} ${_additional_libraries} PSBLAS_INCLUDE_DIR
+    ${_psblas_library_variables} ${_psblas_cuda_library_variables} ${_additional_libraries} PSBLAS_INCLUDE_DIR
   )

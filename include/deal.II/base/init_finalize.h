@@ -66,7 +66,19 @@ enum class InitializeLibrary
   /**
    * Initialize/finalize P4EST and SC.
    */
-  PSBLAS = 64
+  PSBLAS = 64,
+  /**
+   * Initialize/finalize the PSBLAS CUDA backend (calls psb_c_cuda_init()
+   * and psb_c_cuda_exit()). Only meaningful when PSBLAS was built with
+   * CUDA support. Must be combined with @p PSBLAS:
+   * @code
+   *   InitFinalize init(argc, argv,
+   *                     InitializeLibrary::MPI |
+   *                     InitializeLibrary::PSBLAS |
+   *                     InitializeLibrary::PSBLASCuda);
+   * @endcode
+   */
+  PSBLASCuda = 128
 };
 
 
@@ -187,6 +199,16 @@ public:
    */
   static psb_c_ctxt *
   get_psblas_context();
+
+#  ifdef PSB_HAVE_CUDA
+  /**
+   * Returns the number of CUDA devices visible to PSBLAS.
+   * Only valid after InitFinalize has been constructed with
+   * InitializeLibrary::PSBLAS | InitializeLibrary::PSBLASCuda.
+   */
+  static psb_m_t
+  get_cuda_device_count();
+#  endif
 #endif
 
   /**
