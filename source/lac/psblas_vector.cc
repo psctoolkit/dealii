@@ -40,9 +40,12 @@ namespace PSCToolkitWrappers
     : Vector::Vector()
   {
     if (v.has_ghost_elements())
-      reinit(v.owned_elements, v.ghost_indices, v.communicator);
+      reinit(v.owned_elements,
+             v.ghost_indices,
+             v.communicator,
+             v.storage_format);
     else
-      reinit(v.owned_elements, v.communicator);
+      reinit(v.owned_elements, v.communicator, false, v.storage_format);
 
     this->operator=(v);
   }
@@ -60,39 +63,42 @@ namespace PSCToolkitWrappers
 
 
 
-  Vector::Vector(const IndexSet &local_partitioning, const MPI_Comm comm)
+  Vector::Vector(const IndexSet      &local_partitioning,
+                 const MPI_Comm       comm,
+                 const StorageFormat &fmt)
   {
     communicator  = comm;
     psblas_vector = nullptr;
     ghosted       = false;
-    // forward the call to reinit function below.
-    reinit(local_partitioning, communicator);
+    reinit(local_partitioning, communicator, false, fmt);
   }
 
 
 
-  Vector::Vector(const IndexSet &local_partitioning,
-                 const IndexSet &ghost_indices,
-                 const MPI_Comm  comm)
+  Vector::Vector(const IndexSet      &local_partitioning,
+                 const IndexSet      &ghost_indices,
+                 const MPI_Comm       comm,
+                 const StorageFormat &fmt)
   {
     communicator  = comm;
     psblas_vector = nullptr;
     ghosted       = true;
-    // forward the call to reinit function taking ghost indices.
-    reinit(local_partitioning, ghost_indices, communicator);
+    reinit(local_partitioning, ghost_indices, communicator, fmt);
   }
 
 
 
   void
-  Vector::reinit(const IndexSet &local_partitioning,
-                 const MPI_Comm  comm,
-                 const bool      omit_zeroing_entries)
+  Vector::reinit(const IndexSet      &local_partitioning,
+                 const MPI_Comm       comm,
+                 const bool           omit_zeroing_entries,
+                 const StorageFormat &fmt)
   {
     Assert(communicator != MPI_COMM_NULL,
            ExcMessage("MPI_COMM_NULL passed to Vector::reinit()."));
     communicator                 = comm;
     ghosted                      = false;
+    storage_format               = fmt;
     const bool is_vector_changed = size() != local_partitioning.size();
     owned_elements               = local_partitioning;
 
@@ -152,14 +158,16 @@ namespace PSCToolkitWrappers
 
 
   void
-  Vector::reinit(const IndexSet &local_partitioning,
-                 const IndexSet &ghosts,
-                 const MPI_Comm  comm)
+  Vector::reinit(const IndexSet      &local_partitioning,
+                 const IndexSet      &ghosts,
+                 const MPI_Comm       comm,
+                 const StorageFormat &fmt)
   {
     Assert(comm != MPI_COMM_NULL,
            ExcMessage("MPI_COMM_NULL passed to Vector::reinit()."));
     communicator                 = comm;
     ghosted                      = true;
+    storage_format               = fmt;
     const bool is_vector_changed = size() != local_partitioning.size();
 
     owned_elements = local_partitioning;
@@ -244,7 +252,9 @@ namespace PSCToolkitWrappers
                                        PSB_DUPL_DEF);
 
     // ... and assemble descriptor
-    ierr = psb_c_cdasb(psblas_descriptor.get());
+    // we tell PSBLAS which storage side (HOST/DEVICE)
+    ierr = psb_c_cdasb_format(psblas_descriptor.get(),
+                              storage_format.to_psblas_vect_string().c_str());
 
     Assert(ierr == 0, ExcInitializePSBLASVector(ierr));
     state       = internal::State::Assembled;
@@ -261,7 +271,8 @@ namespace PSCToolkitWrappers
       {
         reinit(v.locally_owned_elements(),
                v.ghost_indices,
-               v.get_mpi_communicator());
+               v.get_mpi_communicator(),
+               v.storage_format);
         if (!omit_zeroing_entries)
           {
             int ierr = psb_c_dvect_set_scal(psblas_vector, 0.0);
@@ -273,7 +284,8 @@ namespace PSCToolkitWrappers
       {
         reinit(v.owned_elements,
                v.get_mpi_communicator(),
-               omit_zeroing_entries);
+               omit_zeroing_entries,
+               v.storage_format);
       }
   }
 
@@ -297,15 +309,51 @@ namespace PSCToolkitWrappers
         if (v.has_ghost_elements())
           reinit(v.locally_owned_elements(),
                  v.ghost_indices,
-                 v.get_mpi_communicator());
+                 v.get_mpi_communicator(),
+                 v.storage_format);
         else
-          reinit(v.owned_elements, v.get_mpi_communicator(), true);
+          reinit(v.owned_elements,
+                 v.get_mpi_communicator(),
+                 true,
+                 v.storage_format);
       }
 
     int ierr = psb_c_dvect_clone(v.psblas_vector, psblas_vector);
     AssertThrow(ierr == 0, ExcAXPBY(ierr));
 
-    // If current vector has ghost elements, update them
+    int err = psb_c_dgereinit(psblas_vector, psblas_descriptor.get(), true);
+    Assert(err == 0, ExcCallingPSBLASFunction(err, "psb_c_dgereinit"));
+#  ifdef PSB_HAVE_CUDA
+    if (storage_format.backend == StorageFormat::Backend::CUDA &&
+        v.storage_format.backend == StorageFormat::Backend::CUDA)
+      {
+        // GPU->GPU: on-device copy
+        int clone_err = psb_c_dvect_clone(v.psblas_vector, psblas_vector);
+        Assert(clone_err == 0,
+               ExcCallingPSBLASFunction(clone_err, "psb_c_dvect_clone"));
+      }
+    else
+#  endif
+      {
+        // CPU -> CPU or GPU->CPU:
+        // psb_c_dvect_f_get_pnt() internally calls vp%sync() for GPU vectors
+        // (device->host cudaMemcpy) before returning the host pointer, so
+        // cross-backend GPU->CPU copies work correctly through this path.
+
+        // CPU->GPU is not supported: there is no C-binding to trigger
+        // host->device after writing through the host-side mirror pointer.
+        Assert(storage_format.backend == StorageFormat::Backend::CPU,
+               ExcMessage(
+                 "operator=(Vector): CPU->GPU cross-backend copy is not "
+                 "supported. Destination must be CPU, or both vectors must "
+                 "use the same CUDA backend."));
+        value_type *start_ptr = psb_c_dvect_f_get_pnt(psblas_vector);
+        value_type *other     = psb_c_dvect_f_get_pnt(v.psblas_vector);
+        for (unsigned int i = 0; i < locally_owned_size(); ++i)
+          start_ptr[i] = other[i];
+      }
+
+    // If destination has ghost elements, update them from owners
     if (has_ghost_elements())
       update_ghost_values();
 
@@ -421,8 +469,6 @@ namespace PSCToolkitWrappers
   bool
   Vector::all_zero() const
   {
-    // we get a pointer to the underlying vector and check if all
-    // entries are zero.
     const value_type *start_ptr = psb_c_dvect_f_get_pnt(psblas_vector);
     Assert(start_ptr != nullptr,
            ExcMessage("Error getting underlying PSBLAS vector."));
@@ -501,6 +547,43 @@ namespace PSCToolkitWrappers
     AssertThrow(ierr == 0, ExcAXPBY(ierr));
     return *this;
   }
+
+
+
+  void
+  Vector::do_set_add_operation(const size_type   n_elements,
+                               const size_type  *indices,
+                               const value_type *values,
+                               const bool        add_values)
+  {
+    const VectorOperation::values action =
+      (add_values ? VectorOperation::add : VectorOperation::insert);
+    Assert((last_action == action) || (last_action == VectorOperation::unknown),
+           ExcWrongMode(action, last_action));
+    Assert(!has_ghost_elements(), ExcGhostsPresent());
+
+    std::vector<psb_l_t> psblas_indices(n_elements);
+    for (size_type i = 0; i < n_elements; ++i)
+      {
+        const auto index = static_cast<value_type>(indices[i]);
+        AssertIntegerConversion(index, indices[i]);
+        psblas_indices[i] = index;
+      }
+
+    // insertion mode
+    const psb_i_t mode = (add_values ? PSB_ADD_VALUES : PSB_INSERT_VALUES);
+    int           err  = psb_c_dgeins_options(n_elements,
+                                   psblas_indices.data(),
+                                   values,
+                                   psblas_vector,
+                                   psblas_descriptor.get(),
+                                   mode);
+    AssertThrow(err == 0,
+                ExcCallingPSBLASFunction(err, "psb_c_dgeins_options"));
+
+    last_action = action;
+  }
+
 
 
   void
@@ -591,6 +674,15 @@ namespace PSCToolkitWrappers
   {
     AssertIsFinite(s);
     Assert(!has_ghost_elements(), ExcGhostsPresent());
+
+    // this operation is restricted to CPU vectors (writing through the
+    // host-side pointer does not propagate back to device memory for GPU
+    // vectors)
+    Assert(storage_format.backend == StorageFormat::Backend::CPU,
+           ExcMessage(
+             "add(scalar): modifying entries via host pointer does not sync "
+             "back to device memory for GPU vectors. Use set()+compress() "
+             "or a PSBLAS kernel (e.g. psb_c_dgeaxpby) instead."));
     value_type *start_ptr = psb_c_dvect_f_get_pnt(psblas_vector);
     value_type *end_ptr   = start_ptr + locally_owned_size();
     while (start_ptr != end_ptr)
@@ -632,6 +724,14 @@ namespace PSCToolkitWrappers
   {
     Assert(!has_ghost_elements(), ExcGhostsPresent());
     AssertDimension(size(), v.size());
+
+    // Writing through the host-side pointer does not propagate back to device
+    // memory for GPU vectors.
+    Assert(
+      storage_format.backend == StorageFormat::Backend::CPU,
+      ExcMessage(
+        "scale(): modifying entries via host pointer does not sync back "
+        "to device memory for GPU vectors. Use set()+compress() instead."));
     value_type *start_ptr   = psb_c_dvect_f_get_pnt(psblas_vector);
     value_type *start_ptr_v = psb_c_dvect_f_get_pnt(v.psblas_vector);
     value_type *end_ptr     = start_ptr + locally_owned_size();
@@ -666,6 +766,7 @@ namespace PSCToolkitWrappers
     std::swap(psblas_descriptor, v.psblas_descriptor);
     std::swap(ghosted, v.ghosted);
     std::swap(this->last_action, v.last_action);
+    std::swap(storage_format, v.storage_format);
     // We use a temp variable to swap the IndexSets
     IndexSet temp(ghost_indices);
     ghost_indices   = v.ghost_indices;
@@ -696,21 +797,32 @@ namespace PSCToolkitWrappers
     int ierr;
     if (!psb_c_cd_is_asb(psblas_descriptor.get()))
       {
-        ierr = psb_c_cdasb(psblas_descriptor.get());
+        ierr =
+          psb_c_cdasb_format(psblas_descriptor.get(),
+                             storage_format.to_psblas_vect_string().c_str());
         Assert(ierr == 0, ExcAssemblePSBLASDescriptor(ierr));
       }
 
     // finally, we perform the assemble operation
-    if (operation == VectorOperation::add)
-      ierr = psb_c_dgeasb_options(psblas_vector,
-                                  psblas_descriptor.get(),
-                                  PSB_DUPL_ADD);
-    else if (operation == VectorOperation::insert)
-      ierr = psb_c_dgeasb_options(psblas_vector,
-                                  psblas_descriptor.get(),
-                                  PSB_DUPL_DEF);
-    else
-      DEAL_II_NOT_IMPLEMENTED();
+    // if (operation == VectorOperation::add)
+    //   ierr = psb_c_dgeasb_options(psblas_vector,
+    //                               psblas_descriptor.get(),
+    //                               PSB_DUPL_ADD);
+    // else if (operation == VectorOperation::insert)
+    //   ierr = psb_c_dgeasb_options(psblas_vector,
+    //                               psblas_descriptor.get(),
+    //                               PSB_DUPL_DEF);
+    // else
+    //   DEAL_II_NOT_IMPLEMENTED();
+
+    // Finally, assemble the vector using the configured storage
+    // backend. psb_c_dgeasb_options_format() accepts "CPU"/"HOST" for the host
+    // path and "GPU"/"DEVICE" for the CUDA path
+    ierr = psb_c_dgeasb_options_format(
+      psblas_vector,
+      psblas_descriptor.get(),
+      PSB_DUPL_DEF,
+      storage_format.to_psblas_vect_string().c_str());
 
     Assert(ierr == 0, ExcAssemblePSBLASVector(ierr));
     state       = internal::State::Assembled;

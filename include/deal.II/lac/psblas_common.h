@@ -18,6 +18,8 @@
 #include "deal.II/base/exception_macros.h"
 #include <deal.II/base/exceptions.h>
 
+#include <string>
+
 
 #ifdef DEAL_II_WITH_PSBLAS
 
@@ -71,6 +73,129 @@ namespace PSCToolkitWrappers
     };
 
   } // namespace internal
+
+
+  /**
+   * Selects the storage backend and optional format for a PSBLAS
+   * vector or sparse matrix.
+   *
+   * PSBLAS supports multiple storage representations on both the CPU host
+   * and the CUDA device. For matrices, the @p format string selects the
+   * storage scheme (e.g., @p "CSR", @p "HLL" on CPU; @p "HLG", @p "CSRG"
+   * on CUDA). For vectors, only the backend matters in current PSBLAS (the
+   * C binding accepts @p "CPU"/"GPU").
+   *
+   * Convenience factory functions cover the common cases:
+   * @code
+   *   // CPU matrix in HLL format
+   *   auto fmt = StorageFormat::cpu("HLL");
+   *
+   *   // CUDA matrix in HLG format
+   *   auto fmt = StorageFormat::cuda("HLG");
+   *
+   *   // Default CPU (PSBLAS chooses format)
+   *   auto fmt = StorageFormat{};
+   * @endcode
+   */
+  struct StorageFormat
+  {
+    /**
+     * Backend selector: where the data lives.
+     */
+    enum class Backend
+    {
+      /** Data lives on the CPU host. This is the default. */
+      CPU,
+#  ifdef PSB_HAVE_CUDA
+      /** Data lives on the CUDA device. */
+      CUDA,
+#  endif
+    };
+
+    /**
+     * The backend for this object.
+     */
+    Backend backend = Backend::CPU;
+
+    /**
+     * Optional format string forwarded verbatim to PSBLAS (e.g.,
+     * @p "HLL", @p "HLG", @p "CSR"). An empty string lets PSBLAS pick
+     * its own default for the chosen backend.
+     */
+    std::string format;
+
+    /**
+     * Factory: CPU storage with the given optional format.
+     */
+    static StorageFormat
+    cpu(const std::string &fmt = "")
+    {
+      return {Backend::CPU, fmt};
+    }
+
+#  ifdef PSB_HAVE_CUDA
+    /**
+     * Factory: CUDA device storage with the given optional format.
+     */
+    static StorageFormat
+    cuda(const std::string &fmt = "")
+    {
+      return {Backend::CUDA, fmt};
+    }
+#  endif
+
+    /**
+     * Return the backend string expected by @p psb_c_cdasb_format() and
+     * @p psb_c_dgeasb_options_format().
+     *
+     * Always returns @p "GPU" for CUDA and @p "CPU" for host, regardless of
+     * the @p format field. Neither the descriptor nor the vector assembly
+     * function accept format strings — those are only valid for
+     * @p psb_c_dspasb_opt() (matrices).
+     */
+    std::string
+    to_psblas_backend_string() const
+    {
+#  ifdef PSB_HAVE_CUDA
+      if (backend == Backend::CUDA)
+        return "GPU";
+#  endif
+      return "CPU";
+    }
+
+    /**
+     * Alias for @p to_psblas_backend_string(). Kept for readability at
+     * vector-assembly call sites.
+     */
+    std::string
+    to_psblas_vect_string() const
+    {
+      return to_psblas_backend_string();
+    }
+
+    /**
+     * Return the format string expected by @p psb_c_dspasb_opt() for
+     * <b>matrices</b>.
+     *
+     * CPU formats include @p "CSR", @p "ELL", @p "HLL", @p "HDIA",
+     * @p "DNS". CUDA formats include @p "CSRG", @p "ELG", @p "HLG",
+     * @p "HDIAG". If @p format is non-empty it is returned verbatim;
+     * otherwise a sensible default is chosen per backend (@p "CSR" for
+     * CPU, @p "HLG" for CUDA).
+     */
+    std::string
+    to_psblas_mat_string() const
+    {
+      if (!format.empty())
+        return format;
+#  ifdef PSB_HAVE_CUDA
+      if (backend == Backend::CUDA)
+        return "HLG";
+#  endif
+      return "CSR";
+    }
+  };
+
 
   /**
    * Exception

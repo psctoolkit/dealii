@@ -42,8 +42,9 @@ namespace PSCToolkitWrappers
     /**
      * Constructor of a square sparsity pattern from an existing IndexSet.
      */
-    SparsityPattern(const IndexSet &parallel_partitioning,
-                    const MPI_Comm  communicator = MPI_COMM_WORLD);
+    SparsityPattern(const IndexSet      &parallel_partitioning,
+                    const MPI_Comm       communicator   = MPI_COMM_WORLD,
+                    const StorageFormat &storage_format = {});
 
     /**
      * Destructor.
@@ -83,6 +84,8 @@ namespace PSCToolkitWrappers
 
   private:
     std::shared_ptr<psb_c_descriptor> psblas_descriptor;
+
+    StorageFormat storage_format;
 
     friend class SparseMatrix;
   };

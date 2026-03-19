@@ -95,8 +95,9 @@ namespace PSCToolkitWrappers
      * parallel partitioning of the matrix.
      */
     void
-    reinit(const IndexSet &parallel_partitioning,
-           const MPI_Comm  communicator = MPI_COMM_WORLD);
+    reinit(const IndexSet      &parallel_partitioning,
+           const MPI_Comm       communicator   = MPI_COMM_WORLD,
+           const StorageFormat &storage_format = {});
 
     /**
      * Initialize using an IndexSet and a MPI communicator to describe the
@@ -104,7 +105,8 @@ namespace PSCToolkitWrappers
      */
     void
     reinit(const SparsityPattern &psblas_sparsity_pattern,
-           const MPI_Comm         communicator = MPI_COMM_WORLD);
+           const MPI_Comm         communicator   = MPI_COMM_WORLD,
+           const StorageFormat   &storage_format = {});
 
     /**
      * Initialize a square matrix where the size() of the IndexSet determines
@@ -113,7 +115,8 @@ namespace PSCToolkitWrappers
     void
     reinit(const IndexSet               &local_rows,
            const DynamicSparsityPattern &sparsity_pattern,
-           const MPI_Comm                communicator = MPI_COMM_WORLD);
+           const MPI_Comm                communicator   = MPI_COMM_WORLD,
+           const StorageFormat          &storage_format = {});
 
     /**
      * Return the number of rows in this matrix.
@@ -361,12 +364,17 @@ namespace PSCToolkitWrappers
     psb_c_ctxt *psblas_context;
 
     /**
-     * State of the descriptor associated with the vector. Its state can be
-     * either default, building or assembled).
+     * State of the descriptor associated with the matrix.
      */
     internal::State state;
 
     friend class PreconditionAMG;
+    /**
+     * Stores the storage backend and optional format used when
+     * assembling this matrix. The default is StorageFormat::Backend::CPU
+     * with PSBLAS choosing the format ("CSR").
+     */
+    StorageFormat storage_format;
   };
 
 

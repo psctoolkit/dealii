@@ -178,6 +178,18 @@ InitFinalize::InitFinalize([[maybe_unused]] int    &argc,
       psb_c_init(cctxt);
       psb_c_set_index_base(0); // Set index base to 0 (PSBLAS default is 1)
     }
+
+#  ifdef PSB_HAVE_CUDA
+  if (static_cast<bool>(libraries & InitializeLibrary::PSBLASCuda))
+    {
+      Assert(
+        static_cast<bool>(libraries & InitializeLibrary::PSBLAS),
+        ExcMessage(
+          "InitializeLibrary::PSBLASCuda requires InitializeLibrary::PSBLAS "
+          "to also be set."));
+      psb_c_cuda_init(cctxt);
+    }
+#  endif
 #endif
 
   constructor_has_already_run = true;
@@ -355,6 +367,15 @@ InitFinalize::get_psblas_context()
   Assert(cctxt != nullptr, ExcMessage("PSBLAS context was not initialized."));
   return cctxt;
 }
+
+#  ifdef PSB_HAVE_CUDA
+psb_m_t
+InitFinalize::get_cuda_device_count()
+{
+  return psb_c_cuda_getDeviceCount();
+}
+#  endif
+
 #endif
 
 void
@@ -438,6 +459,10 @@ InitFinalize::finalize()
 #ifdef DEAL_II_WITH_PSBLAS
       if (static_cast<bool>(libraries & InitializeLibrary::PSBLAS))
         {
+#  ifdef PSB_HAVE_CUDA
+          if (static_cast<bool>(libraries & InitializeLibrary::PSBLASCuda))
+            psb_c_cuda_exit();
+#  endif
           psb_c_exit_ctxt(*cctxt);
           free(cctxt);
         }

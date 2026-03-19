@@ -87,14 +87,17 @@ namespace PSCToolkitWrappers
 
 
   void
-  SparseMatrix::reinit(const IndexSet &index_set, const MPI_Comm comm)
+  SparseMatrix::reinit(const IndexSet      &index_set,
+                       const MPI_Comm       comm,
+                       const StorageFormat &sf)
   {
     Assert(index_set.n_elements() > 0,
            ExcMessage("An empty IndexSet has been given."));
 
     Assert(comm != MPI_COMM_NULL,
            ExcMessage("MPI_COMM_NULL passed to SparseMatrix::reinit()."));
-    communicator = comm;
+    communicator   = comm;
+    storage_format = sf;
 
     // Free old resources before reinitializing
     if (psblas_sparse_matrix != nullptr && psblas_descriptor.get() != nullptr)
@@ -144,12 +147,14 @@ namespace PSCToolkitWrappers
 
   void
   SparseMatrix::reinit(const SparsityPattern &psblas_sparsity_pattern,
-                       const MPI_Comm         communicator)
+                       const MPI_Comm         communicator,
+                       const StorageFormat   &sf)
   {
     Assert(psblas_sparsity_pattern.psblas_descriptor.get() != nullptr,
            ExcMessage("The given SparsityPattern is not valid."));
 
     this->communicator = communicator;
+    storage_format     = sf;
     Assert(communicator != MPI_COMM_NULL,
            ExcMessage("MPI_COMM_NULL passed to SparseMatrix::reinit()."));
 
@@ -179,7 +184,8 @@ namespace PSCToolkitWrappers
   void
   SparseMatrix::reinit(const IndexSet               &local_rows,
                        const DynamicSparsityPattern &sparsity_pattern,
-                       const MPI_Comm                communicator)
+                       const MPI_Comm                communicator,
+                       const StorageFormat          &sf)
   {
     Assert(sparsity_pattern.n_rows() == sparsity_pattern.n_cols(),
            ExcNotQuadratic());
@@ -215,6 +221,7 @@ namespace PSCToolkitWrappers
       }
 
     this->communicator = communicator;
+    storage_format     = sf;
 
     // Set up the PSBLAS descriptor from the local IndexSet
     psblas_descriptor.reset(psb_c_new_descriptor(),
@@ -558,15 +565,22 @@ namespace PSCToolkitWrappers
     int err = -1;
     if (!psb_c_cd_is_asb(psblas_descriptor.get()))
       {
-        err = psb_c_cdasb(psblas_descriptor.get());
+        err =
+          psb_c_cdasb_format(psblas_descriptor.get(),
+                             storage_format.to_psblas_vect_string().c_str());
         Assert(err == 0, ExcAssemblePSBLASDescriptor(err));
       }
 
-    // Check if the sparse matrix is not already assembled
+    // ... and the sparse matrix using the configured format.
+    // psb_c_dspasb_opt() accepts the matrix storage format string directly
+    // (e.g. "CSR", "HLL" for CPU; "HLG", "CSRG" for CUDA).
     if (!psb_c_dis_matasb(psblas_sparse_matrix, psblas_descriptor.get()))
       {
-        // ... and the sparse matrix
-        err = psb_c_dspasb(psblas_sparse_matrix, psblas_descriptor.get());
+        err = psb_c_dspasb_opt(psblas_sparse_matrix,
+                               psblas_descriptor.get(),
+                               storage_format.to_psblas_mat_string().c_str(),
+                               PSB_UPD_DFLT,
+                               PSB_DUPL_DEF);
         Assert(err == 0, ExcAssemblePSBLASMatrix(err));
       }
   }

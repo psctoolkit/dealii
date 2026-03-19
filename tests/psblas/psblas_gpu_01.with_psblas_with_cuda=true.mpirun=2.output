@@ -1,0 +1,5 @@
+
+DEAL:0::CUDA device count >= 1: OK
+
+DEAL:1::CUDA device count >= 1: OK
+
