@@ -253,8 +253,9 @@ namespace PSCToolkitWrappers
 
     // ... and assemble descriptor
     // we tell PSBLAS which storage side (HOST/DEVICE)
-    ierr = psb_c_cdasb_format(psblas_descriptor.get(),
-                              storage_format.to_psblas_vect_string().c_str());
+    ierr =
+      psb_c_cdasb_format(psblas_descriptor.get(),
+                         storage_format.to_psblas_backend_string().c_str());
 
     Assert(ierr == 0, ExcInitializePSBLASVector(ierr));
     state       = internal::State::Assembled;
@@ -799,7 +800,7 @@ namespace PSCToolkitWrappers
       {
         ierr =
           psb_c_cdasb_format(psblas_descriptor.get(),
-                             storage_format.to_psblas_vect_string().c_str());
+                             storage_format.to_psblas_backend_string().c_str());
         Assert(ierr == 0, ExcAssemblePSBLASDescriptor(ierr));
       }
 
@@ -822,7 +823,7 @@ namespace PSCToolkitWrappers
       psblas_vector,
       psblas_descriptor.get(),
       PSB_DUPL_DEF,
-      storage_format.to_psblas_vect_string().c_str());
+      storage_format.to_psblas_backend_string().c_str());
 
     Assert(ierr == 0, ExcAssemblePSBLASVector(ierr));
     state       = internal::State::Assembled;

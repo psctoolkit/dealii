@@ -567,7 +567,7 @@ namespace PSCToolkitWrappers
       {
         err =
           psb_c_cdasb_format(psblas_descriptor.get(),
-                             storage_format.to_psblas_vect_string().c_str());
+                             storage_format.to_psblas_backend_string().c_str());
         Assert(err == 0, ExcAssemblePSBLASDescriptor(err));
       }
 

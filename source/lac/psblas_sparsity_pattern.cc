@@ -38,9 +38,8 @@ namespace PSCToolkitWrappers
 
     storage_format = fmt;
 
-    psblas_descriptor.reset(
-      psb_c_new_descriptor(),
-      PSCToolkitWrappers::internal::PSBLASDescriptorDeleter());
+    psblas_descriptor.reset(psb_c_new_descriptor(),
+                            PSCToolkitWrappers::internal::DescriptorDeleter());
 
     // Use get_index_vector() from IndexSet to get the indexes
     const std::vector<types::global_dof_index> &indexes =
@@ -124,7 +123,7 @@ namespace PSCToolkitWrappers
       {
         err =
           psb_c_cdasb_format(psblas_descriptor.get(),
-                             storage_format.to_psblas_vect_string().c_str());
+                             storage_format.to_psblas_backend_string().c_str());
         Assert(err == 0, ExcMessage("Error while finalizing SparsityPattern."));
       }
   }

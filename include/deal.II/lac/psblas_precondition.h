@@ -227,6 +227,13 @@ namespace PSCToolkitWrappers
      * PSBLAS descriptor.
      */
     std::shared_ptr<psb_c_descriptor> psblas_descriptor;
+
+    /**
+     * Stores the storage backend and optional format used when
+     * assembling this matrix. The default is StorageFormat::Backend::CPU
+     * with PSBLAS choosing the format ("CSR").
+     */
+    StorageFormat storage_format;
   };
 
 } // namespace PSCToolkitWrappers

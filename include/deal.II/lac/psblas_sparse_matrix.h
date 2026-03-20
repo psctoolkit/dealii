@@ -369,6 +369,7 @@ namespace PSCToolkitWrappers
     internal::State state;
 
     friend class PreconditionAMG;
+
     /**
      * Stores the storage backend and optional format used when
      * assembling this matrix. The default is StorageFormat::Backend::CPU

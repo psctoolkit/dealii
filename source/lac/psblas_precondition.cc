@@ -36,8 +36,11 @@ namespace PSCToolkitWrappers
     Assert(matrix.psblas_sparse_matrix != nullptr,
            ExcMessage("Matrix has not been initialized."));
 
-    // set descriptor from matrix and allocate workspace with proper size
+    // set descriptor from matrix...
     psblas_descriptor = matrix.psblas_descriptor;
+
+    // ... and acquire storage format and backend from the matrix object
+    storage_format = matrix.storage_format;
 
     int err = amg_c_dprecinit(*InitFinalize::get_psblas_context(),
                               psblas_preconditioner,
@@ -96,10 +99,35 @@ namespace PSCToolkitWrappers
     AssertThrow(err == 0,
                 ExcMessage("Error " + std::to_string(err) +
                            " while building AMG hierarchy."));
+
+#  ifdef PSB_HAVE_CUDA
+    err = amg_c_dsmoothers_build_opt(
+      matrix.psblas_sparse_matrix,
+      psblas_descriptor.get(),
+      psblas_preconditioner,
+      storage_format.to_psblas_mat_string().c_str(),
+      storage_format.to_psblas_backend_string().c_str());
+    AssertThrow(err == 0,
+                ExcMessage("Error " + std::to_string(err) +
+                           " while building AMG smoothers with CUDA."));
+
+    //  allocate work vectors for the preconditioner application on the GPU
+    err =
+      amg_c_dallocate_wrk(psblas_preconditioner,
+                          storage_format.to_psblas_backend_string().c_str());
+    AssertThrow(err == 0,
+                ExcMessage(
+                  "Error " + std::to_string(err) +
+                  " while allocating work vectors for AMG with CUDA."));
+
+
+
+#  else
     //... and smoothers
     err = amg_c_dsmoothers_build(matrix.psblas_sparse_matrix,
                                  psblas_descriptor.get(),
                                  psblas_preconditioner);
+#  endif
     AssertThrow(err == 0,
                 ExcMessage("Error " + std::to_string(err) +
                            " while building AMG smoothers."));
@@ -130,8 +158,8 @@ namespace PSCToolkitWrappers
   void
   PreconditionAMG::clear()
   {
-    int err = amg_c_dprecfree(psblas_preconditioner);
-    Assert(err == 0, ExcCallingPSBLASFunction(err, "amg_c_dprecfree"));
+    free(psblas_preconditioner);
+    // Assert(err == 0, ExcCallingPSBLASFunction(err, "amg_c_dprecfree"));
     psblas_preconditioner = nullptr;
   }
 

@@ -164,16 +164,6 @@ namespace PSCToolkitWrappers
     }
 
     /**
-     * Alias for @p to_psblas_backend_string(). Kept for readability at
-     * vector-assembly call sites.
-     */
-    std::string
-    to_psblas_vect_string() const
-    {
-      return to_psblas_backend_string();
-    }
-
-    /**
      * Return the format string expected by @p psb_c_dspasb_opt() for
      * <b>matrices</b>.
      *
