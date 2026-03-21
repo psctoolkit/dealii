@@ -430,6 +430,17 @@ namespace PSCToolkitWrappers
     void
     add(const value_type s);
 
+
+    /**
+     * Addition of two scaled vectors, i.e. <tt>*this += a*V + b*W</tt>.
+     */
+    void
+    add(const value_type a,
+        const Vector    &V,
+        const value_type b,
+        const Vector    &W);
+
+
     /**
      * Scale each element of this vector by the corresponding element in the
      * argument. This function is mostly meant to simulate multiplication (and
@@ -510,6 +521,13 @@ namespace PSCToolkitWrappers
      */
     Vector &
     operator+=(const Vector &v);
+
+
+    /**
+     * Multiply all components of the vector by the given number @p s.
+     */
+    Vector &
+    operator*=(const value_type s);
 
     /**
      * Set all components of the vector to the given number @p s. Simply pass
