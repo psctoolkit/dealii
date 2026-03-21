@@ -132,6 +132,10 @@ namespace PSCToolkitWrappers
                               *psblas_context,
                               psblas_descriptor.get());
 
+        // Assemble the descriptor
+        ierr = psb_c_cdasb(psblas_descriptor.get());
+        Assert(ierr == 0, ExcAssemblePSBLASDescriptor(ierr));
+
         // Free the vl array
         Assert(ierr == 0, ExcInitializePSBLASDescriptor(ierr));
       }
@@ -283,10 +287,50 @@ namespace PSCToolkitWrappers
       }
     else
       {
-        reinit(v.owned_elements,
-               v.get_mpi_communicator(),
-               omit_zeroing_entries,
-               v.storage_format);
+        // reinit(v.owned_elements,
+        //        v.get_mpi_communicator(),
+        //        omit_zeroing_entries,
+        //        v.storage_format);
+        // Free old vector if it exists, before replacing the descriptor
+        int ierr;
+        if (state != internal::State::Default && psblas_vector != nullptr)
+          {
+            ierr = psb_c_dgefree(psblas_vector, psblas_descriptor.get());
+            Assert(ierr == 0, ExcFreePSBLASVector(ierr));
+            psblas_vector = nullptr;
+          }
+
+        // Copy parallel layout
+        communicator   = v.get_mpi_communicator();
+        ghosted        = false;
+        owned_elements = v.owned_elements;
+        psblas_context = v.psblas_context;
+
+        // Share the descriptor — do NOT call reinit(IndexSet,...) which
+        // would overwrite this with a brand new descriptor
+        psblas_descriptor = v.psblas_descriptor;
+
+        // Allocate a new vector against the shared descriptor
+        psblas_vector = psb_c_new_dvector();
+        ierr          = psb_c_dgeall_remote_options(psblas_vector,
+                                           psblas_descriptor.get(),
+                                           PSB_MATBLD_REMOTE,
+                                           PSB_DUPL_DEF);
+        Assert(ierr == 0, ExcInitializePSBLASVector(ierr));
+
+        // Assemble the vector
+        ierr = psb_c_dgeasb(psblas_vector, psblas_descriptor.get());
+        Assert(ierr == 0, ExcMessage("Error assembling PSBLAS vector."));
+
+        if (!omit_zeroing_entries)
+          {
+            ierr = psb_c_dvect_set_scal(psblas_vector, 0.0);
+            Assert(ierr == 0,
+                   ExcCallingPSBLASFunction(ierr, "psb_c_dvect_set_scal"));
+          }
+
+        state       = internal::State::Assembled;
+        last_action = VectorOperation::unknown;
       }
   }
 
