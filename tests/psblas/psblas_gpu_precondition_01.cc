@@ -79,7 +79,6 @@ main(int argc, char **argv)
     }
   A.compress();
 
-  // ── Build the AMG preconditioner on the GPU matrix ────────────────────────
   PSCToolkitWrappers::PreconditionAMG                 prec;
   PSCToolkitWrappers::PreconditionAMG::AdditionalData prec_data;
   prec_data.cycle_type  = "VCYCLE";
@@ -88,9 +87,7 @@ main(int argc, char **argv)
   prec_data.coarse_type = "ILU";
   prec.initialize(A, prec_data);
 
-  // ── Check 1: CG convergence within a known iteration range ───────────────
-  //
-  // Build rhs b = (1, 1, ..., 1) and a zero initial guess.
+
   PSCToolkitWrappers::Vector b(local_rows, comm, vec_fmt);
   PSCToolkitWrappers::Vector x_sol(local_rows, comm, vec_fmt);
   for (const auto i : local_rows)
