@@ -1,7 +1,7 @@
 ## -----------------------------------------------------------------------------
 ##
 ## SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR LGPL-2.1-or-later
-## Copyright (C) 2017 - 2022 by the deal.II authors
+## Copyright (C) 2017 - 2026 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -82,6 +82,8 @@ process_feature(AMG4PSBLAS
   LIBRARIES 
     REQUIRED 
     ${_amg4psblas_library_variables}
+    # AMG's static archives depend on PSBLAS and must precede them.
+    PSBLAS_LIBRARIES
     ${_additional_libraries}
     LAPACK_LIBRARIES
     OPTIONAL

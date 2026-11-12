@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR LGPL-2.1-or-later
-// Copyright (C) 2008 - 2023 by the deal.II authors
+// Copyright (C) 2008 - 2026 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -31,6 +31,11 @@ namespace PSCToolkitWrappers
   /**
    * This class implements an interface to the AMG4PSBLAS algebraic
    * multigrid preconditioner.
+   *
+   * To precondition a block system, initialize individual instances with
+   * square diagonal blocks of a BlockSparseMatrix and apply them to the
+   * corresponding blocks of a BlockVector. The applications operate directly
+   * on the native PSBLAS vector handles.
    *
    * @note This class is only available if deal.II was configured with PSBLAS
    * and AMG4PSBLAS.
@@ -177,7 +182,8 @@ namespace PSCToolkitWrappers
 
     /**
      * Let AMG4PSBLAS compute a multilevel hierarchy for the solution of a
-     * linear system with the given matrix.
+     * linear system with the given matrix. The matrix must be square and
+     * have identical row and column partitions.
      */
     void
     initialize(const SparseMatrix   &matrix,
@@ -185,7 +191,8 @@ namespace PSCToolkitWrappers
 
     /**
      * Destroys the preconditioner, leaving an object like just after having
-     * called the constructor.
+     * called the constructor. This function may be called repeatedly, and
+     * initialize() may be called afterwards.
      */
     void
     clear();

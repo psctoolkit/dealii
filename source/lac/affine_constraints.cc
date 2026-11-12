@@ -12,6 +12,8 @@
 
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/affine_constraints.templates.h>
+#include <deal.II/lac/psblas_block_sparse_matrix.h>
+#include <deal.II/lac/psblas_block_vector.h>
 
 #include <complex>
 

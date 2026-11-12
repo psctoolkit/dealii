@@ -428,6 +428,54 @@ for (V : PSCTOOLKIT_VECTORS)
     template void AffineConstraints<double>::distribute<V>(V &) const;
   }
 
+for (V : PSCTOOLKIT_BLOCK_VECTORS)
+  {
+    template void AffineConstraints<double>::distribute<V>(V &) const;
+  }
+
+for (M : PSCTOOLKIT_BLOCK_MATRICES)
+  {
+    template void AffineConstraints<double>::
+      distribute_local_to_global<M, PSCToolkitWrappers::BlockVector>(
+        const FullMatrix<double> &,
+        const Vector<double> &,
+        const std::vector<AffineConstraints<double>::size_type> &,
+        M &,
+        PSCToolkitWrappers::BlockVector &,
+        bool,
+        std::bool_constant<true>) const;
+
+    template void AffineConstraints<double>::distribute_local_to_global<M>(
+      const FullMatrix<double> &,
+      const std::vector<AffineConstraints<double>::size_type> &,
+      M &) const;
+
+    template void AffineConstraints<double>::distribute_local_to_global<M>(
+      const FullMatrix<double> &,
+      const std::vector<AffineConstraints<double>::size_type> &,
+      const std::vector<AffineConstraints<double>::size_type> &,
+      M &) const;
+
+    template void AffineConstraints<double>::distribute_local_to_global<M>(
+      const FullMatrix<double> &,
+      const std::vector<AffineConstraints<double>::size_type> &,
+      const AffineConstraints<double> &,
+      const std::vector<AffineConstraints<double>::size_type> &,
+      M &) const;
+
+    // Required to create the Vector dummy object in the variants of the
+    // function that do not take a vector argument.
+    template void
+    AffineConstraints<double>::distribute_local_to_global<M, Vector<double>>(
+      const FullMatrix<double> &,
+      const Vector<double> &,
+      const std::vector<AffineConstraints<double>::size_type> &,
+      M &,
+      Vector<double> &,
+      bool,
+      std::bool_constant<true>) const;
+  }
+
 
 //
 // FIXME: These mixed variants are needed for multigrid and matrix free.

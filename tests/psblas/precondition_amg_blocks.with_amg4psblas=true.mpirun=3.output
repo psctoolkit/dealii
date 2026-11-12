@@ -1,0 +1,5 @@
+
+DEAL::Scalar AMG reuse OK
+DEAL::Native block AMG OK
+DEAL::Empty rank AMG OK
+DEAL::Subcommunicator AMG OK

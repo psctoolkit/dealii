@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR LGPL-2.1-or-later
-// Copyright (C) 2008 - 2023 by the deal.II authors
+// Copyright (C) 2008 - 2026 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -15,6 +15,8 @@
 #include <deal.II/lac/psblas_precondition.h>
 
 #ifdef DEAL_II_WITH_AMG4PSBLAS
+
+#  include <cstdlib>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -33,13 +35,19 @@ namespace PSCToolkitWrappers
   {
     Assert(matrix.psblas_sparse_matrix != nullptr,
            ExcMessage("Matrix has not been initialized."));
+    AssertDimension(matrix.m(), matrix.n());
+    Assert(matrix.get_psblas_descriptor() ==
+             matrix.get_psblas_column_descriptor(),
+           ExcMessage("AMG requires identical row and column partitions."));
 
-    // set descriptor from matrix and allocate workspace with proper size
+    if (psblas_preconditioner == nullptr)
+      psblas_preconditioner = amg_c_dprec_new();
+
+    // Share the matrix descriptor used by the native AMG operations.
     psblas_descriptor = matrix.psblas_descriptor;
 
-    int err = amg_c_dprecinit(*InitFinalize::get_psblas_context(),
-                              psblas_preconditioner,
-                              "ML");
+    int err =
+      amg_c_dprecinit(*matrix.psblas_context, psblas_preconditioner, "ML");
     AssertThrow(err == 0,
                 ExcMessage("Error " + std::to_string(err) +
                            " while initializing AMG preconditioner."));
@@ -128,9 +136,23 @@ namespace PSCToolkitWrappers
   void
   PreconditionAMG::clear()
   {
-    int err = amg_c_dprecfree(psblas_preconditioner);
-    Assert(err == 0, ExcCallingPSBLASFunction(err, "amg_c_dprecfree"));
-    psblas_preconditioner = nullptr;
+    if (psblas_preconditioner != nullptr)
+      {
+        // An allocated C handle need not contain an initialized Fortran
+        // preconditioner yet. AMG4PSBLAS cannot free an uninitialized one.
+        if (psblas_preconditioner->dprec != nullptr)
+          {
+            const int err = amg_c_dprec_delete(psblas_preconditioner);
+            AssertThrow(err == 0,
+                        ExcCallingPSBLASFunction(err, "amg_c_dprec_delete"));
+          }
+        else
+          std::free(psblas_preconditioner);
+
+        psblas_preconditioner = nullptr;
+      }
+
+    psblas_descriptor.reset();
   }
 
 

@@ -16,6 +16,8 @@
 
 #include <deal.II/lac/psblas_vector.h>
 
+#include <cstdlib>
+
 #ifdef DEAL_II_WITH_PSBLAS
 #  include <psb_base_cbind.h>
 #  include <psb_c_base.h>
@@ -52,23 +54,30 @@ namespace PSCToolkitWrappers
 
   Vector::~Vector()
   {
-    if (state != internal::State::Default)
+    release_vector();
+  }
+
+
+
+  void
+  Vector::release_vector()
+  {
+    if (psblas_vector != nullptr)
       {
-        int ierr;
-        ierr = psb_c_dgefree(psblas_vector, psblas_descriptor.get());
+        const int ierr = psb_c_dgefree(psblas_vector, psblas_descriptor.get());
         AssertNothrow(ierr == 0, ExcFreePSBLASVector(ierr));
+        std::free(psblas_vector);
+        psblas_vector = nullptr;
       }
   }
 
 
 
   Vector::Vector(const IndexSet &local_partitioning, const MPI_Comm comm)
+    : Vector()
   {
-    communicator  = comm;
-    psblas_vector = nullptr;
-    ghosted       = false;
     // forward the call to reinit function below.
-    reinit(local_partitioning, communicator);
+    reinit(local_partitioning, comm);
   }
 
 
@@ -76,12 +85,10 @@ namespace PSCToolkitWrappers
   Vector::Vector(const IndexSet &local_partitioning,
                  const IndexSet &ghost_indices,
                  const MPI_Comm  comm)
+    : Vector()
   {
-    communicator  = comm;
-    psblas_vector = nullptr;
-    ghosted       = true;
     // forward the call to reinit function taking ghost indices.
-    reinit(local_partitioning, ghost_indices, communicator);
+    reinit(local_partitioning, ghost_indices, comm);
   }
 
 
@@ -110,6 +117,8 @@ namespace PSCToolkitWrappers
     const bool partitioning_will_change =
       Utilities::MPI::logical_or(partitioning_changes_locally, comm);
 
+    release_vector();
+
     communicator   = comm;
     ghosted        = false;
     owned_elements = local_partitioning;
@@ -119,8 +128,12 @@ namespace PSCToolkitWrappers
     int ierr;
     if (partitioning_will_change == true)
       {
+        const auto context = std::make_shared<internal::Context>(comm);
+        psblas_context     = context->get_psblas_context();
         psblas_descriptor.reset(psb_c_new_descriptor(),
-                                internal::DescriptorDeleter());
+                                [context](psb_c_descriptor *descriptor) {
+                                  internal::DescriptorDeleter()(descriptor);
+                                });
 
         // Use get_index_vector() from IndexSet to get the indexes
         const std::vector<types::global_dof_index> &indexes =
@@ -138,14 +151,19 @@ namespace PSCToolkitWrappers
           }
 
         // Insert the indexes into the descriptor
-        psblas_context = InitFinalize::get_psblas_context();
-        ierr           = psb_c_cdall_vl(number_of_local_indexes,
+        ierr = psb_c_cdall_vl(number_of_local_indexes,
                               vl.data(),
                               *psblas_context,
                               psblas_descriptor.get());
 
         // Free the vl array
         Assert(ierr == 0, ExcInitializePSBLASDescriptor(ierr));
+      }
+
+    if (!psb_c_cd_is_asb(psblas_descriptor.get()))
+      {
+        ierr = psb_c_cdasb(psblas_descriptor.get());
+        Assert(ierr == 0, ExcAssemblePSBLASDescriptor(ierr));
       }
 
     // Create a new PSBLAS vector and allocate mem space for vector
@@ -156,6 +174,13 @@ namespace PSCToolkitWrappers
                                        PSB_MATBLD_REMOTE,
                                        PSB_DUPL_DEF);
     Assert(ierr == 0, ExcInitializePSBLASVector(ierr));
+
+    // The native vector must be assembled too: rectangular matrix products
+    // consume this handle directly, just like the existing square products.
+    ierr = psb_c_dgeasb_options(psblas_vector,
+                                psblas_descriptor.get(),
+                                PSB_DUPL_DEF);
+    Assert(ierr == 0, ExcAssemblePSBLASVector(ierr));
 
     if (omit_zeroing_entries == false)
       {
@@ -199,6 +224,8 @@ namespace PSCToolkitWrappers
     const bool partitioning_will_change =
       Utilities::MPI::logical_or(partitioning_changes_locally, comm);
 
+    release_vector();
+
     communicator   = comm;
     ghosted        = true;
     owned_elements = local_partitioning;
@@ -209,8 +236,12 @@ namespace PSCToolkitWrappers
     int ierr;
     if (partitioning_will_change == true)
       {
+        const auto context = std::make_shared<internal::Context>(comm);
+        psblas_context     = context->get_psblas_context();
         psblas_descriptor.reset(psb_c_new_descriptor(),
-                                internal::DescriptorDeleter());
+                                [context](psb_c_descriptor *descriptor) {
+                                  internal::DescriptorDeleter()(descriptor);
+                                });
 
         // Use get_index_vector() from IndexSet to get the indexes
         const std::vector<types::global_dof_index> &indexes =
@@ -238,8 +269,7 @@ namespace PSCToolkitWrappers
         // - lidx: corresponding local indices
 
         // Insert the indexes into the descriptor
-        psblas_context = InitFinalize::get_psblas_context();
-        ierr           = psb_c_cdall_vl_lidx(number_of_local_indexes,
+        ierr = psb_c_cdall_vl_lidx(number_of_local_indexes,
                                    vl.data(),
                                    lidx.data(),
                                    *psblas_context,
@@ -310,6 +340,8 @@ namespace PSCToolkitWrappers
   void
   Vector::reinit(const Vector &v, const bool omit_zeroing_entries)
   {
+    release_vector();
+    psblas_context    = v.psblas_context;
     psblas_descriptor = v.psblas_descriptor;
     if (v.has_ghost_elements())
       {
@@ -328,17 +360,6 @@ namespace PSCToolkitWrappers
         reinit(v.owned_elements,
                v.get_mpi_communicator(),
                omit_zeroing_entries);
-
-        int ierr;
-        if (!psb_c_cd_is_asb(psblas_descriptor.get()))
-          {
-            ierr = psb_c_cdasb(psblas_descriptor.get());
-            Assert(ierr == 0, ExcAssemblePSBLASDescriptor(ierr));
-          }
-        ierr = psb_c_dgeasb_options(psblas_vector,
-                                    psblas_descriptor.get(),
-                                    PSB_DUPL_DEF);
-        Assert(ierr == 0, ExcAssemblePSBLASVector(ierr));
       }
   }
 
@@ -357,6 +378,8 @@ namespace PSCToolkitWrappers
     // Vectors can have different sizes. If so, we first resize the vector
     if (size() != v.size())
       {
+        release_vector();
+        psblas_context = v.psblas_context;
         //  since v has been assembled, we can recycle its descriptor
         psblas_descriptor = v.psblas_descriptor;
         if (v.has_ghost_elements())
@@ -427,21 +450,18 @@ namespace PSCToolkitWrappers
   void
   Vector::clear()
   {
-    if (state != internal::State::Default)
-      {
-        int ierr = psb_c_dgefree(psblas_vector, psblas_descriptor.get());
-        Assert(ierr == 0, ExcFreePSBLASVector(ierr));
-
-        // Reset the vector
-        psblas_vector = nullptr;
-        owned_elements.clear();
-        owned_elements.set_size(0);
-        ghost_indices.clear();
-        owned_elements.set_size(0);
-        state                  = internal::State::Default;
-        last_action            = VectorOperation::unknown;
-        remote_entries_pending = false;
-      }
+    release_vector();
+    psblas_descriptor.reset();
+    psblas_context = InitFinalize::get_psblas_context();
+    owned_elements.clear();
+    owned_elements.set_size(0);
+    ghost_indices.clear();
+    ghost_indices.set_size(0);
+    communicator           = MPI_COMM_NULL;
+    ghosted                = false;
+    state                  = internal::State::Default;
+    last_action            = VectorOperation::unknown;
+    remote_entries_pending = false;
   }
 
 
@@ -476,15 +496,22 @@ namespace PSCToolkitWrappers
 
 
 
+  Vector::real_type
+  Vector::norm_sqr() const
+  {
+    return *this * *this;
+  }
+
+
+
   Vector::value_type
   Vector::mean_value() const
   {
     const value_type *start_ptr = psb_c_dvect_f_get_pnt(psblas_vector);
-    const value_type *end_ptr   = start_ptr + locally_owned_size();
 
     value_type local_sum_of_values = 0.0;
-    for (const value_type *ptr = start_ptr; ptr != end_ptr; ++ptr)
-      local_sum_of_values += *ptr;
+    for (size_type i = 0; i < locally_owned_size(); ++i)
+      local_sum_of_values += start_ptr[i];
 
     return Utilities::MPI::sum(local_sum_of_values, communicator) / size();
   }
@@ -496,18 +523,35 @@ namespace PSCToolkitWrappers
   {
     // we get a pointer to the underlying vector and check if all
     // entries are zero.
-    const value_type *start_ptr = psb_c_dvect_f_get_pnt(psblas_vector);
-    Assert(start_ptr != nullptr,
-           ExcMessage("Error getting underlying PSBLAS vector."));
-
-    const bool has_nonzero_local =
-      std::any_of(start_ptr,
-                  start_ptr + locally_owned_size(),
-                  [](const value_type &val) { return val != value_type(); });
+    const value_type *start_ptr         = psb_c_dvect_f_get_pnt(psblas_vector);
+    bool              has_nonzero_local = false;
+    for (size_type i = 0; i < locally_owned_size(); ++i)
+      has_nonzero_local = has_nonzero_local || start_ptr[i] != value_type();
 
     unsigned int num_nonzero =
       Utilities::MPI::sum(has_nonzero_local ? 1 : 0, communicator);
     return num_nonzero == 0;
+  }
+
+
+
+  bool
+  Vector::is_non_negative() const
+  {
+    const value_type *const values = psb_c_dvect_f_get_pnt(psblas_vector);
+    bool                    local_is_non_negative = true;
+    for (size_type i = 0; i < locally_owned_size(); ++i)
+      local_is_non_negative = local_is_non_negative && values[i] >= 0.;
+
+    return Utilities::MPI::logical_and(local_is_non_negative, communicator);
+  }
+
+
+
+  bool
+  Vector::in_local_range(const size_type index) const
+  {
+    return owned_elements.is_element(index);
   }
 
 
@@ -576,6 +620,25 @@ namespace PSCToolkitWrappers
   }
 
 
+  Vector &
+  Vector::operator*=(const value_type factor)
+  {
+    equ(factor, *this);
+    return *this;
+  }
+
+
+
+  Vector &
+  Vector::operator/=(const value_type factor)
+  {
+    AssertIsFinite(factor);
+    Assert(factor != 0., ExcDivideByZero());
+    return *this *= value_type(1.) / factor;
+  }
+
+
+
   void
   Vector::set(const std::vector<Vector::size_type>  &indices,
               const std::vector<Vector::value_type> &values)
@@ -630,8 +693,12 @@ namespace PSCToolkitWrappers
         const auto nz = static_cast<psb_i_t>(irw.size());
         AssertIntegerConversion(nz, irw.size());
 
-        const int ierr = psb_c_dgeins(
-          nz, irw.data(), val.data(), psblas_vector, psblas_descriptor.get());
+        const int ierr = psb_c_dgeins_options(nz,
+                                              irw.data(),
+                                              val.data(),
+                                              psblas_vector,
+                                              psblas_descriptor.get(),
+                                              PSB_DUPL_ADD);
         Assert(ierr == 0, ExcInsertionInPSBLASVector(ierr));
 
         remote_entries_pending = true;
@@ -656,17 +723,24 @@ namespace PSCToolkitWrappers
 
 
   void
+  Vector::add(const value_type a,
+              const Vector    &V,
+              const value_type b,
+              const Vector    &W)
+  {
+    sadd(1., a, V, b, W);
+  }
+
+
+
+  void
   Vector::add(const value_type s)
   {
     AssertIsFinite(s);
     Assert(!has_ghost_elements(), ExcGhostsPresent());
     value_type *start_ptr = psb_c_dvect_f_get_pnt(psblas_vector);
-    value_type *end_ptr   = start_ptr + locally_owned_size();
-    while (start_ptr != end_ptr)
-      {
-        *start_ptr += s;
-        ++start_ptr;
-      }
+    for (size_type i = 0; i < locally_owned_size(); ++i)
+      start_ptr[i] += s;
   }
 
 
@@ -697,19 +771,64 @@ namespace PSCToolkitWrappers
 
 
   void
+  Vector::sadd(const value_type s,
+               const value_type a,
+               const Vector    &V,
+               const value_type b,
+               const Vector    &W)
+  {
+    AssertDimension(size(), V.size());
+    AssertDimension(size(), W.size());
+    AssertIsFinite(a);
+    AssertIsFinite(b);
+
+    // Account for aliases before changing any entries.
+    *this *= s + (&V == this ? a : 0.) + (&W == this ? b : 0.);
+    if (&V != this)
+      add(a, V);
+    if (&W != this)
+      add(b, W);
+  }
+
+
+
+  void
+  Vector::sadd(const value_type s,
+               const value_type a,
+               const Vector    &V,
+               const value_type b,
+               const Vector    &W,
+               const value_type c,
+               const Vector    &X)
+  {
+    AssertDimension(size(), V.size());
+    AssertDimension(size(), W.size());
+    AssertDimension(size(), X.size());
+    AssertIsFinite(a);
+    AssertIsFinite(b);
+    AssertIsFinite(c);
+
+    *this *=
+      s + (&V == this ? a : 0.) + (&W == this ? b : 0.) + (&X == this ? c : 0.);
+    if (&V != this)
+      add(a, V);
+    if (&W != this)
+      add(b, W);
+    if (&X != this)
+      add(c, X);
+  }
+
+
+
+  void
   Vector::scale(const Vector &v)
   {
     Assert(!has_ghost_elements(), ExcGhostsPresent());
     AssertDimension(size(), v.size());
     value_type *start_ptr   = psb_c_dvect_f_get_pnt(psblas_vector);
     value_type *start_ptr_v = psb_c_dvect_f_get_pnt(v.psblas_vector);
-    value_type *end_ptr     = start_ptr + locally_owned_size();
-    while (start_ptr != end_ptr)
-      {
-        *start_ptr *= (*start_ptr_v);
-        ++start_ptr;
-        ++start_ptr_v;
-      }
+    for (size_type i = 0; i < locally_owned_size(); ++i)
+      start_ptr[i] *= start_ptr_v[i];
   }
 
 
@@ -732,6 +851,7 @@ namespace PSCToolkitWrappers
   {
     // simply swap pointers
     std::swap(psblas_vector, v.psblas_vector);
+    std::swap(psblas_context, v.psblas_context);
     std::swap(psblas_descriptor, v.psblas_descriptor);
     std::swap(ghosted, v.ghosted);
     std::swap(this->last_action, v.last_action);
@@ -783,41 +903,20 @@ namespace PSCToolkitWrappers
                  operation == VectorOperation::insert,
                ExcNotImplemented());
 
-#  ifdef FALSE
-        // Uncomment this path when psb_c_dgereinit() is available in the PSBLAS
-
-        // Move the vector into update state, in which psb_geasb() only
-        // exchanges the pending remote contributions and leaves the entries
-        // we already hold alone.
-        ierr = psb_c_dgereinit(psblas_vector, psblas_descriptor.get(), false);
-        Assert(ierr == 0, ExcCallingPSBLASFunction(ierr, "psb_c_dgereinit"));
-#  else
-        // Without psb_c_dgereinit() the vector stays in build state, where
-        // psb_geasb() rebuilds it from the list of inserted coefficients. The
-        // entries we already hold therefore have to be put onto that list in
-        // order to survive.
-        const std::vector<types::global_dof_index> &indices =
-          owned_elements.get_index_vector();
-        const value_type *const local_values =
-          psb_c_dvect_f_get_pnt(psblas_vector);
-
-        std::vector<psb_l_t> irw(indices.size());
-        std::vector<psb_d_t> val(indices.size());
-        for (std::size_t i = 0; i < indices.size(); ++i)
-          {
-            const auto psblas_index = static_cast<psb_l_t>(indices[i]);
-            AssertIntegerConversion(psblas_index, indices[i]);
-            irw[i] = psblas_index;
-            val[i] = local_values[i];
-          }
-
-        const auto nz = static_cast<psb_i_t>(irw.size());
-        AssertIntegerConversion(nz, irw.size());
-
-        ierr = psb_c_dgeins(
-          nz, irw.data(), val.data(), psblas_vector, psblas_descriptor.get());
+        // Processes that only receive contributions must also enter the
+        // native update state. A zero-length insertion preserves the owned
+        // entries and resets the remote insertion list after the previous
+        // assembly. Processes that have already inserted remote entries are
+        // already in update state, so their pending contributions are kept.
+        psb_l_t dummy_index = 0;
+        psb_d_t dummy_value = 0.;
+        ierr                = psb_c_dgeins_options(0,
+                                    &dummy_index,
+                                    &dummy_value,
+                                    psblas_vector,
+                                    psblas_descriptor.get(),
+                                    PSB_DUPL_ADD);
         Assert(ierr == 0, ExcInsertionInPSBLASVector(ierr));
-#  endif
 
         ierr = psb_c_dgeasb_options(psblas_vector,
                                     psblas_descriptor.get(),

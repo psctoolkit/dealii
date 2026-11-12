@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR LGPL-2.1-or-later
-// Copyright (C) 2019 - 2023 by the deal.II authors
+// Copyright (C) 2019 - 2026 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,6 +20,9 @@
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/vector.h>
+#include <deal.II/lac/vector_operation.h>
+
+#include <map>
 
 
 #ifdef DEAL_II_WITH_PSBLAS
@@ -55,6 +58,12 @@ namespace PSCToolkitWrappers
    *    <em>Assembled</em> state, in which matrix-vector products and
    *    other algebraic operations become available.
    *
+   * The overloads of reinit() taking two IndexSets describe independent row
+   * and column spaces. These overloads support rectangular matrices and MPI
+   * subcommunicators. Products use native PSCToolkitWrappers::Vector objects
+   * with the corresponding row and column ownership. PSBLAS manages the halo
+   * storage needed by each matrix descriptor.
+   *
    * A SparsityPattern can optionally be provided at construction time to
    * pre-allocate the non-zero structure, which is strongly recommended
    * for performance.
@@ -73,6 +82,14 @@ namespace PSCToolkitWrappers
      * Type for container values.
      */
     using value_type = double;
+
+    /**
+     * Properties used by BlockMatrixBase during assembly.
+     */
+    struct Traits
+    {
+      static constexpr bool zero_addition_can_be_elided = true;
+    };
 
     /**
      *Default constructor. Generates an empty (zero-size) matrix.
@@ -142,6 +159,50 @@ namespace PSCToolkitWrappers
            const MPI_Comm                communicator = MPI_COMM_WORLD);
 
     /**
+     * Initialize a possibly rectangular matrix with independent row and
+     * column partitions. Each index must be owned by exactly one process.
+     * Empty local partitions are allowed. This operation is collective on
+     * @p communicator, which may be an MPI subcommunicator.
+     *
+     * Entries may be contributed to any row during the subsequent assembly.
+     * Call compress() collectively before using the matrix. Insertions with
+     * set() and additions with add() must not be mixed in the same assembly.
+     * Reinitialize the matrix to assemble a new operator.
+     */
+    void
+    reinit(const IndexSet &local_rows,
+           const IndexSet &local_columns,
+           const MPI_Comm  communicator = MPI_COMM_WORLD);
+
+    /**
+     * As above, with the locally owned part of @p sparsity_pattern used to
+     * initialize the matrix structure.
+     */
+    void
+    reinit(const IndexSet               &local_rows,
+           const IndexSet               &local_columns,
+           const DynamicSparsityPattern &sparsity_pattern,
+           const MPI_Comm                communicator = MPI_COMM_WORLD);
+
+    /**
+     * Release the matrix and its descriptors.
+     */
+    void
+    clear();
+
+    /**
+     * Return the locally owned row indices.
+     */
+    IndexSet
+    locally_owned_range_indices() const;
+
+    /**
+     * Return the locally owned column indices.
+     */
+    IndexSet
+    locally_owned_domain_indices() const;
+
+    /**
      * Return the number of rows in this matrix.
      */
     size_type
@@ -170,6 +231,9 @@ namespace PSCToolkitWrappers
      * locally. If this is a sequential matrix, then the result will be the
      * pair (0,m()), otherwise it will be a pair (i,i+n), where
      * <tt>n=local_size()</tt>.
+     * For a noncontiguous partition the pair bounds the owned indices;
+     * use locally_owned_range_indices() to obtain the exact set. An empty
+     * local partition returns the pair (0,0).
      */
     std::pair<size_type, size_type>
     local_range() const;
@@ -225,6 +289,17 @@ namespace PSCToolkitWrappers
     void
     set(const std::vector<size_type> &indices,
         const FullMatrix<double>     &matrix);
+
+    /**
+     * Set entries in one row. If @p elide_zero_values is true, zero entries
+     * are skipped. Otherwise they overwrite an earlier value.
+     */
+    void
+    set(const size_type   row,
+        const size_type   n_columns,
+        const size_type  *column_indices,
+        const value_type *values,
+        const bool        elide_zero_values = false);
 
     /**
      * Add value 'value' to the element (i,j). If <tt>value</tt> is
@@ -286,6 +361,26 @@ namespace PSCToolkitWrappers
      */
     void
     compress();
+
+    /**
+     * Complete assembly with the given operation. This overload allows
+     * BlockMatrixBase to forward its assembly operation to each block.
+     * The existing no-argument compress() remains available.
+     */
+    void
+    compress(const VectorOperation::values operation);
+
+    /**
+     * Prepare for additive assembly through BlockMatrixBase.
+     */
+    void
+    prepare_add();
+
+    /**
+     * Prepare for overwrite assembly through BlockMatrixBase.
+     */
+    void
+    prepare_set();
 
     /**
      * Matrix-vector multiplication: let <i>dst = M*src</i> with <i>M</i>
@@ -370,6 +465,13 @@ namespace PSCToolkitWrappers
     get_psblas_descriptor() const;
 
     /**
+     * Return the column descriptor. For matrices with identical row and
+     * column partitions this is the row descriptor.
+     */
+    psb_c_descriptor *
+    get_psblas_column_descriptor() const;
+
+    /**
      * Return the underlying MPI communicator. Do not use this function unless
      * you know what you are doing.
      */
@@ -392,6 +494,40 @@ namespace PSCToolkitWrappers
      * Shared pointer to the underlying PSBLAS descriptor object.
      */
     std::shared_ptr<psb_c_descriptor> psblas_descriptor;
+
+    /**
+     * Column descriptor for the two-partition interface. An empty pointer
+     * identifies the original single-partition assembly interface.
+     */
+    std::shared_ptr<psb_c_descriptor> psblas_column_descriptor;
+
+    /**
+     * Context ownership for a matrix constructed with two partitions.
+     */
+    std::shared_ptr<internal::Context> owned_context;
+
+    /**
+     * Row and column partitions for the two-partition interface.
+     */
+    IndexSet row_partition;
+    IndexSet column_partition;
+
+    /**
+     * Contributions waiting to be routed to their row owners during
+     * assembly. No vector storage is kept by the matrix wrapper.
+     */
+    std::map<std::pair<size_type, size_type>, value_type> pending_entries;
+
+    /**
+     * Pending assembly operation: zero for none, one for set, two for add.
+     */
+    unsigned int assembly_operation = 0;
+
+    /**
+     * Finish assembly through the two-partition interface.
+     */
+    void
+    compress_partitions();
 
     /**
      * Pointer to the underlying PSBLAS context object.

@@ -37,3 +37,9 @@ for (V : PSCTOOLKIT_VECTORS)
   {
     template class GrowingVectorMemory<V>;
   }
+
+for (V : PSCTOOLKIT_BLOCK_VECTORS)
+  {
+    template class VectorMemory<V>;
+    template class GrowingVectorMemory<V>;
+  }

@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR LGPL-2.1-or-later
-// Copyright (C) 2019 - 2025 by the deal.II authors
+// Copyright (C) 2019 - 2026 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,6 +17,9 @@
 
 #include "deal.II/base/exception_macros.h"
 #include <deal.II/base/exceptions.h>
+#include <deal.II/base/mpi.h>
+
+#include <cstdlib>
 
 
 #ifdef DEAL_II_WITH_PSBLAS
@@ -34,6 +37,32 @@ namespace PSCToolkitWrappers
 
   namespace internal
   {
+    /**
+     * PSBLAS context associated with a communicator. The context initialized
+     * by InitFinalize is reused for MPI_COMM_WORLD and congruent communicators.
+     * Other communicators have a separately owned context. Such objects must
+     * be destroyed collectively before MPI finalization.
+     */
+    class Context
+    {
+    public:
+      explicit Context(const MPI_Comm communicator);
+
+      ~Context();
+
+      Context(const Context &) = delete;
+      Context &
+      operator=(const Context &) = delete;
+
+      psb_c_ctxt *
+      get_psblas_context() const;
+
+    private:
+      MPI_Comm    communicator = MPI_COMM_NULL;
+      psb_c_ctxt  owned_context{};
+      psb_c_ctxt *context = nullptr;
+    };
+
     /*
      * Custom deleter for PSBLAS descriptor. This will be invoked automatically
      * by the shared pointer.
@@ -44,7 +73,10 @@ namespace PSCToolkitWrappers
       operator()(psb_c_descriptor *p) const
       {
         if (p != nullptr)
-          psb_c_cdfree(p);
+          {
+            psb_c_cdfree(p);
+            std::free(p);
+          }
       }
     };
 

@@ -1,7 +1,7 @@
 ## -----------------------------------------------------------------------------
 ##
 ## SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR LGPL-2.1-or-later
-## Copyright (C) 2017 - 2025 by the deal.II authors
+## Copyright (C) 2017 - 2026 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -40,6 +40,8 @@ endmacro()
 macro(feature_psblas_configure_external)
   set(DEAL_II_EXPAND_PSBLAS_VECTOR "PSCToolkitWrappers::Vector")
   set(DEAL_II_EXPAND_PSBLAS_SPARSE_MATRICES "PSCToolkitWrappers::SparseMatrix")
+  set(DEAL_II_EXPAND_PSBLAS_BLOCK_SPARSE_MATRICES "PSCToolkitWrappers::BlockSparseMatrix")
+  set(DEAL_II_EXPAND_PSBLAS_BLOCK_VECTOR "PSCToolkitWrappers::BlockVector")
   set(DEAL_II_EXPAND_PSBLAS_SPARSITY_PATTERN "PSCToolkitWrappers::SparsityPattern")
 endmacro()
 

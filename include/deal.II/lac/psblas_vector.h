@@ -42,8 +42,8 @@ namespace PSCToolkitWrappers
    * (Parallel Sparse BLAS), which is the computational kernel of the
    * <a href="https://psctoolkit.github.io/">PSCToolkit</a> library.
    *
-   * This class stores a contiguous block of vector entries on each MPI
-   * process according to an IndexSet partitioning, and optionally
+   * This class distributes vector entries across MPI processes according
+   * to an IndexSet partitioning, and optionally
    * maintains read-only ghost elements for entries owned by other
    * processes. It supports the standard algebraic operations (addition,
    * scaling, inner products, norms) as well as element-wise access. The
@@ -54,14 +54,14 @@ namespace PSCToolkitWrappers
    * -# Create the vector by providing an IndexSet that describes the
    *    parallel partitioning (i.e., which global degrees of freedom are
    *    owned by each MPI process) and the MPI communicator, either
-   *    through the constructor or a call to reinit().  At this point the
-   *    vector is in the <em>Build</em> state.
+   *    through the constructor or a call to reinit(). The vector is
+   *    initialized with zero entries unless zeroing is explicitly omitted.
    * -# Fill the vector by inserting or adding values through set(),
    *    add(), or the element access operators.
-   * -# Call compress() to transition the vector to the
-   *    <em>Assembled</em> state, in which algebraic operations such as
-   *    norms, inner products, and matrix-vector products become
-   *    available.
+   * -# Call compress() with the matching insertion operation to complete
+   *    the assembly, including any pending contributions to entries owned
+   *    by other processes. The vector can then be used in algebraic
+   *    operations such as norms, inner products, and matrix-vector products.
    *
    * @ingroup PSCToolkitWrappers
    * @ingroup Vectors
@@ -244,6 +244,12 @@ namespace PSCToolkitWrappers
     using size_type = dealii::types::global_dof_index;
 
     using value_type = double;
+
+    using real_type = double;
+
+    using reference = VectorReference;
+
+    using const_reference = double;
 
     /**
      *Default constructor. Generates an empty (zero-size) vector.
@@ -456,6 +462,15 @@ namespace PSCToolkitWrappers
     add(const value_type s, const Vector &V);
 
     /**
+     * Add two scaled vectors, i.e. <tt>*this += a*V + b*W</tt>.
+     */
+    void
+    add(const value_type a,
+        const Vector    &V,
+        const value_type b,
+        const Vector    &W);
+
+    /**
      * Addition of <tt>s</tt> to all components.
      */
     void
@@ -492,6 +507,30 @@ namespace PSCToolkitWrappers
      */
     void
     sadd(const value_type s, const value_type a, const Vector &V);
+
+    /**
+     * Scale this vector and add two scaled vectors, i.e.
+     * <tt>*this = s*(*this) + a*V + b*W</tt>.
+     */
+    void
+    sadd(const value_type s,
+         const value_type a,
+         const Vector    &V,
+         const value_type b,
+         const Vector    &W);
+
+    /**
+     * Scale this vector and add three scaled vectors, i.e.
+     * <tt>*this = s*(*this) + a*V + b*W + c*X</tt>.
+     */
+    void
+    sadd(const value_type s,
+         const value_type a,
+         const Vector    &V,
+         const value_type b,
+         const Vector    &W,
+         const value_type c,
+         const Vector    &X);
 
     /*
      * Assignment *this = a*V.
@@ -540,6 +579,18 @@ namespace PSCToolkitWrappers
      */
     Vector &
     operator+=(const Vector &v);
+
+    /**
+     * Multiply all entries by @p factor.
+     */
+    Vector &
+    operator*=(const value_type factor);
+
+    /**
+     * Divide all entries by the nonzero value @p factor.
+     */
+    Vector &
+    operator/=(const value_type factor);
 
     /**
      * Set all components of the vector to the given number @p s. Simply pass
@@ -687,6 +738,12 @@ namespace PSCToolkitWrappers
     l2_norm() const;
 
     /**
+     * Return the square of the $l_2$-norm.
+     */
+    real_type
+    norm_sqr() const;
+
+    /**
      * Compute the mean value of the vector.
      */
     Vector::value_type
@@ -701,12 +758,31 @@ namespace PSCToolkitWrappers
     all_zero() const;
 
     /**
+     * Return whether all entries are nonnegative. This is a collective
+     * operation over the vector's communicator.
+     */
+    bool
+    is_non_negative() const;
+
+    /**
+     * Return whether @p index is locally owned.
+     */
+    bool
+    in_local_range(const size_type index) const;
+
+    /**
      * Estimate for the memory consumption (not implemented for this class).
      */
     std::size_t
     memory_consumption() const;
 
   private:
+    /**
+     * Release native vector storage before its descriptor or context changes.
+     */
+    void
+    release_vector();
+
     /*
      * Pointer to the underlying PSBLAS vector.
      */
@@ -899,14 +975,11 @@ namespace PSCToolkitWrappers
 
     if (ghosted)
       {
-        types::global_dof_index begin = *owned_elements.begin();
-        types::global_dof_index end   = begin + owned_elements.n_elements();
-
         auto input = indices_begin;
         while (input != indices_end)
           {
             const auto index = static_cast<psb_l_t>(*input);
-            AssertThrow((index >= begin && index < end) ||
+            AssertThrow(owned_elements.is_element(index) ||
                           ghost_indices.is_element(index),
                         ExcMessage(
                           "You are trying to access an element of a vector "

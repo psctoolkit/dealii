@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR LGPL-2.1-or-later
-// Copyright (C) 2000 - 2018 by the deal.II authors
+// Copyright (C) 2000 - 2026 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,6 +13,11 @@
 
 
 for (VECTOR : VECTOR_TYPES)
+  {
+    dealii::GrowingVectorMemory<dealii::VECTOR>::release_unused_memory();
+  }
+
+for (VECTOR : PSCTOOLKIT_BLOCK_VECTORS)
   {
     dealii::GrowingVectorMemory<dealii::VECTOR>::release_unused_memory();
   }

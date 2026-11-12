@@ -59,6 +59,9 @@ DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 #endif
 
 #ifdef DEAL_II_WITH_PSBLAS
+#  include <deal.II/lac/psblas_block_vector.h>
+#  include <deal.II/lac/psblas_vector.h>
+
 #  include <psb_c_base.h>
 #endif
 
@@ -475,6 +478,10 @@ InitFinalize::finalize()
 #ifdef DEAL_II_WITH_PSBLAS
       if (static_cast<bool>(libraries & InitializeLibrary::PSBLAS))
         {
+          GrowingVectorMemory<
+            PSCToolkitWrappers::Vector>::release_unused_memory();
+          GrowingVectorMemory<
+            PSCToolkitWrappers::BlockVector>::release_unused_memory();
           psb_c_exit_ctxt(*cctxt);
           free(cctxt);
         }
