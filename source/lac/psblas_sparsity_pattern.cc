@@ -42,12 +42,12 @@ namespace PSCToolkitWrappers
     const std::vector<types::global_dof_index> &indexes =
       index_set.get_index_vector();
 
-    psb_i_t number_of_local_indexes = indexes.size(); // Number of local indexes
-    // Copy the indexes into a psb_l_t vector
-    std::vector<psb_l_t> vl(number_of_local_indexes);
-    for (psb_i_t i = 0; i < number_of_local_indexes; ++i)
+    psb_c_i_t number_of_local_indexes = indexes.size(); // Number of local indexes
+    // Copy the indexes into a psb_c_l_t vector
+    std::vector<psb_c_l_t> vl(number_of_local_indexes);
+    for (psb_c_i_t i = 0; i < number_of_local_indexes; ++i)
       {
-        const auto psblas_index = static_cast<psb_l_t>(indexes[i]);
+        const auto psblas_index = static_cast<psb_c_l_t>(indexes[i]);
         AssertIntegerConversion(psblas_index, indexes[i]);
         vl[i] = psblas_index;
       }
@@ -84,9 +84,9 @@ namespace PSCToolkitWrappers
       return;
 
     (void)indices_are_sorted;
-    psb_i_t              nz = static_cast<int>(end - begin);
-    std::vector<psb_l_t> ia(nz);
-    std::vector<psb_l_t> ja(nz);
+    psb_c_i_t              nz = static_cast<int>(end - begin);
+    std::vector<psb_c_l_t> ia(nz);
+    std::vector<psb_c_l_t> ja(nz);
 
     for (int k = 0; k < nz; ++k)
       {

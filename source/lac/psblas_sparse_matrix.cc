@@ -118,13 +118,13 @@ namespace PSCToolkitWrappers
     const std::vector<types::global_dof_index> &indexes =
       index_set.get_index_vector();
 
-    psb_i_t number_of_local_indexes = indexes.size(); // Number of local indexes
+    psb_c_i_t number_of_local_indexes = indexes.size(); // Number of local indexes
 
     // Copy the indexes into an array called vl
-    std::vector<psb_l_t> vl(number_of_local_indexes);
-    for (psb_i_t i = 0; i < number_of_local_indexes; ++i)
+    std::vector<psb_c_l_t> vl(number_of_local_indexes);
+    for (psb_c_i_t i = 0; i < number_of_local_indexes; ++i)
       {
-        const auto psblas_index = static_cast<psb_l_t>(indexes[i]);
+        const auto psblas_index = static_cast<psb_c_l_t>(indexes[i]);
         AssertIntegerConversion(psblas_index, indexes[i]);
         vl[i] = psblas_index;
       }
@@ -218,12 +218,12 @@ namespace PSCToolkitWrappers
     {
       const std::vector<types::global_dof_index> indexes =
         local_rows.get_index_vector();
-      const psb_i_t n_local = static_cast<psb_i_t>(indexes.size());
+      const psb_c_i_t n_local = static_cast<psb_c_i_t>(indexes.size());
 
-      std::vector<psb_l_t> vl(n_local);
-      for (psb_i_t i = 0; i < n_local; ++i)
+      std::vector<psb_c_l_t> vl(n_local);
+      for (psb_c_i_t i = 0; i < n_local; ++i)
         {
-          const auto idx = static_cast<psb_l_t>(indexes[i]);
+          const auto idx = static_cast<psb_c_l_t>(indexes[i]);
           AssertIntegerConversion(idx, indexes[i]);
           vl[i] = idx;
         }
@@ -241,29 +241,29 @@ namespace PSCToolkitWrappers
 
     if (local_rows.n_elements() > 0)
       {
-        const psb_l_t local_row_start =
-          static_cast<psb_l_t>(local_rows.nth_index_in_set(0));
-        const psb_l_t local_row_end =
-          local_row_start + static_cast<psb_l_t>(local_rows.n_elements());
+        const psb_c_l_t local_row_start =
+          static_cast<psb_c_l_t>(local_rows.nth_index_in_set(0));
+        const psb_c_l_t local_row_end =
+          local_row_start + static_cast<psb_c_l_t>(local_rows.n_elements());
 
         // Insert entries from the sparsity pattern row by row
-        for (psb_l_t i = local_row_start; i < local_row_end; ++i)
+        for (psb_c_l_t i = local_row_start; i < local_row_end; ++i)
           {
             const auto row_length =
-              static_cast<psb_i_t>(sparsity_pattern.row_length(i));
+              static_cast<psb_c_i_t>(sparsity_pattern.row_length(i));
             if (row_length == 0)
               continue;
 
-            std::vector<psb_l_t> irw(row_length, i);
-            std::vector<psb_l_t> icl(row_length);
+            std::vector<psb_c_l_t> irw(row_length, i);
+            std::vector<psb_c_l_t> icl(row_length);
 
-            psb_i_t k = 0;
+            psb_c_i_t k = 0;
             for (typename DynamicSparsityPattern::iterator p =
                    sparsity_pattern.begin(i);
                  p != sparsity_pattern.end(i);
                  ++p, ++k)
               {
-                const auto col = static_cast<psb_l_t>(p->column());
+                const auto col = static_cast<psb_c_l_t>(p->column());
                 AssertIntegerConversion(col, p->column());
                 icl[k] = col;
               }
@@ -313,13 +313,13 @@ namespace PSCToolkitWrappers
         psb_c_new_descriptor(),
         [context](psb_c_descriptor *p) { internal::DescriptorDeleter()(p); });
       const auto indices = partition.get_index_vector();
-      const auto count   = static_cast<psb_i_t>(indices.size());
+      const auto count   = static_cast<psb_c_i_t>(indices.size());
       AssertIntegerConversion(count, indices.size());
-      std::vector<psb_l_t> native_indices(
+      std::vector<psb_c_l_t> native_indices(
         std::max<std::size_t>(1, indices.size()));
       for (std::size_t i = 0; i < indices.size(); ++i)
         {
-          native_indices[i] = static_cast<psb_l_t>(indices[i]);
+          native_indices[i] = static_cast<psb_c_l_t>(indices[i]);
           AssertIntegerConversion(native_indices[i], indices[i]);
         }
       const int err = psb_c_cdall_vl(count,
@@ -365,20 +365,20 @@ namespace PSCToolkitWrappers
     for (const auto row : local_rows)
       {
         const auto count =
-          static_cast<psb_i_t>(sparsity_pattern.row_length(row));
+          static_cast<psb_c_i_t>(sparsity_pattern.row_length(row));
         AssertIntegerConversion(count, sparsity_pattern.row_length(row));
         if (count == 0)
           continue;
-        const auto native_row = static_cast<psb_l_t>(row);
+        const auto native_row = static_cast<psb_c_l_t>(row);
         AssertIntegerConversion(native_row, row);
-        std::vector<psb_l_t> rows(count, native_row), columns(count);
-        std::vector<psb_d_t> values(count, 0.0);
-        psb_i_t              k = 0;
+        std::vector<psb_c_l_t> rows(count, native_row), columns(count);
+        std::vector<psb_c_d_t> values(count, 0.0);
+        psb_c_i_t              k = 0;
         for (auto entry = sparsity_pattern.begin(row);
              entry != sparsity_pattern.end(row);
              ++entry, ++k)
           {
-            columns[k] = static_cast<psb_l_t>(entry->column());
+            columns[k] = static_cast<psb_c_l_t>(entry->column());
             AssertIntegerConversion(columns[k], entry->column());
           }
         const int err = psblas_column_descriptor != psblas_descriptor ?
@@ -409,7 +409,7 @@ namespace PSCToolkitWrappers
     IndexSet indices(m());
     if (local_size() != 0)
       {
-        std::vector<psb_l_t> native_indices(local_size());
+        std::vector<psb_c_l_t> native_indices(local_size());
         const int err = psb_c_cd_get_global_indices(native_indices.data(),
                                                     native_indices.size(),
                                                     true,
@@ -567,17 +567,17 @@ namespace PSCToolkitWrappers
 
     // Resolve duplicates before insertion: native sparse assembly sums
     // duplicate entries, while set() must retain the last value from a sender.
-    const auto count = static_cast<psb_i_t>(entries.size());
+    const auto count = static_cast<psb_c_i_t>(entries.size());
     AssertIntegerConversion(count, entries.size());
     if (count != 0)
       {
-        std::vector<psb_l_t> rows(count), columns(count);
-        std::vector<psb_d_t> values(count);
-        psb_i_t              k = 0;
+        std::vector<psb_c_l_t> rows(count), columns(count);
+        std::vector<psb_c_d_t> values(count);
+        psb_c_i_t              k = 0;
         for (const auto &entry : entries)
           {
-            rows[k]    = static_cast<psb_l_t>(entry.first.first);
-            columns[k] = static_cast<psb_l_t>(entry.first.second);
+            rows[k]    = static_cast<psb_c_l_t>(entry.first.first);
+            columns[k] = static_cast<psb_c_l_t>(entry.first.second);
             AssertIntegerConversion(rows[k], entry.first.first);
             AssertIntegerConversion(columns[k], entry.first.second);
             values[k++] = entry.second;
@@ -638,7 +638,7 @@ namespace PSCToolkitWrappers
     if (local_size() == 0)
       return {0, 0};
 
-    std::vector<psb_l_t> local_indices(local_size());
+    std::vector<psb_c_l_t> local_indices(local_size());
     int                  err = psb_c_cd_get_global_indices(local_indices.data(),
                                           local_size(),
                                           true /*only owned indices*/,
@@ -708,9 +708,9 @@ namespace PSCToolkitWrappers
       }
 
     // Insert a value into the sparse matrix
-    psb_l_t irw = i;
-    psb_l_t icl = j;
-    psb_d_t val = value;
+    psb_c_l_t irw = i;
+    psb_c_l_t icl = j;
+    psb_c_d_t val = value;
 
     int err = psb_c_dspins(
       1, &irw, &icl, &val, psblas_sparse_matrix, psblas_descriptor.get());
@@ -723,9 +723,9 @@ namespace PSCToolkitWrappers
   SparseMatrix::el(const SparseMatrix::size_type i,
                    const SparseMatrix::size_type j) const
   {
-    const auto psblas_index_i = static_cast<psb_l_t>(i);
+    const auto psblas_index_i = static_cast<psb_c_l_t>(i);
     AssertIntegerConversion(psblas_index_i, i);
-    const auto psblas_index_j = static_cast<psb_l_t>(j);
+    const auto psblas_index_j = static_cast<psb_c_l_t>(j);
     AssertIntegerConversion(psblas_index_j, j);
 
     if (psblas_column_descriptor != nullptr &&
@@ -733,7 +733,7 @@ namespace PSCToolkitWrappers
       {
         Assert(row_partition.is_element(i),
                ExcMessage("The requested row is not locally owned."));
-        psb_i_t count = 0;
+        psb_c_i_t count = 0;
         int     err   = psb_c_dspget_coo(psblas_sparse_matrix,
                                    psblas_descriptor.get(),
                                    psblas_column_descriptor.get(),
@@ -745,8 +745,8 @@ namespace PSCToolkitWrappers
         Assert(err == 0, ExcCallingPSBLASFunction(err, "psb_c_dspget_coo"));
         if (count == 0)
           return 0.0;
-        std::vector<psb_l_t> rows(count), columns(count);
-        std::vector<psb_d_t> values(count);
+        std::vector<psb_c_l_t> rows(count), columns(count);
+        std::vector<psb_c_d_t> values(count);
         err = psb_c_dspget_coo(psblas_sparse_matrix,
                                psblas_descriptor.get(),
                                psblas_column_descriptor.get(),
@@ -756,7 +756,7 @@ namespace PSCToolkitWrappers
                                columns.data(),
                                values.data());
         Assert(err == 0, ExcCallingPSBLASFunction(err, "psb_c_dspget_coo"));
-        for (psb_i_t k = 0; k < count; ++k)
+        for (psb_c_i_t k = 0; k < count; ++k)
           if (rows[k] == psblas_index_i && columns[k] == psblas_index_j)
             return values[k];
         return 0.0;
@@ -835,18 +835,18 @@ namespace PSCToolkitWrappers
 
     // Get the number of indices.
     const unsigned int n_indices = indices.size();
-    psb_i_t            nz = n_indices * n_indices; // Number of non-zero entries
+    psb_c_i_t            nz = n_indices * n_indices; // Number of non-zero entries
 
     // Fill the arrays with row indices, column indices, and values
-    std::vector<psb_l_t> irw(nz);
-    std::vector<psb_l_t> icl(nz);
-    std::vector<psb_d_t> val(nz);
+    std::vector<psb_c_l_t> irw(nz);
+    std::vector<psb_c_l_t> icl(nz);
+    std::vector<psb_c_d_t> val(nz);
     for (unsigned int i = 0; i < n_indices; ++i)
       {
         for (unsigned int j = 0; j < n_indices; ++j)
           {
-            const auto psblas_row_index = static_cast<psb_l_t>(indices[i]);
-            const auto psblas_col_index = static_cast<psb_l_t>(indices[j]);
+            const auto psblas_row_index = static_cast<psb_c_l_t>(indices[i]);
+            const auto psblas_col_index = static_cast<psb_c_l_t>(indices[j]);
             AssertIntegerConversion(psblas_row_index, indices[i]);
             AssertIntegerConversion(psblas_col_index, indices[j]);
             irw[i * n_indices + j] = psblas_row_index;
@@ -884,8 +884,8 @@ namespace PSCToolkitWrappers
         return;
       }
 
-    psb_l_t irw  = i;
-    psb_l_t icl  = j;
+    psb_c_l_t irw  = i;
+    psb_c_l_t icl  = j;
     int     info = psb_c_dspins(1 /*nz*/,
                             &irw,
                             &icl,
@@ -945,12 +945,12 @@ namespace PSCToolkitWrappers
         return;
       }
 
-    std::vector<psb_l_t> irw(ncols);
-    std::vector<psb_l_t> icl(ncols);
+    std::vector<psb_c_l_t> irw(ncols);
+    std::vector<psb_c_l_t> icl(ncols);
     for (SparseMatrix::size_type i = 0; i < ncols; ++i)
       {
-        irw[i] = static_cast<psb_l_t>(row);
-        icl[i] = static_cast<psb_l_t>(col_indices[i]);
+        irw[i] = static_cast<psb_c_l_t>(row);
+        icl[i] = static_cast<psb_c_l_t>(col_indices[i]);
       }
 
     int info = psb_c_dspins(ncols /*nz*/,

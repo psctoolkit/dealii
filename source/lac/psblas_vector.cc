@@ -142,10 +142,10 @@ namespace PSCToolkitWrappers
         const auto number_of_local_indexes =
           indexes.size(); // Number of local indexes
 
-        std::vector<psb_l_t> vl(number_of_local_indexes);
+        std::vector<psb_c_l_t> vl(number_of_local_indexes);
         for (std::size_t i = 0; i < number_of_local_indexes; ++i)
           {
-            const auto psblas_index = static_cast<psb_l_t>(indexes[i]);
+            const auto psblas_index = static_cast<psb_c_l_t>(indexes[i]);
             AssertIntegerConversion(psblas_index, indexes[i]);
             vl[i] = psblas_index;
           }
@@ -250,12 +250,12 @@ namespace PSCToolkitWrappers
         const auto number_of_local_indexes =
           indexes.size(); // Number of local indexes
 
-        std::vector<psb_l_t> vl(number_of_local_indexes);
-        std::vector<psb_i_t> lidx(number_of_local_indexes);
+        std::vector<psb_c_l_t> vl(number_of_local_indexes);
+        std::vector<psb_c_i_t> lidx(number_of_local_indexes);
         for (std::size_t i = 0; i < number_of_local_indexes; ++i)
           {
-            const auto psblas_index = static_cast<psb_l_t>(indexes[i]);
-            const auto idx          = static_cast<psb_i_t>(i);
+            const auto psblas_index = static_cast<psb_c_l_t>(indexes[i]);
+            const auto idx          = static_cast<psb_c_i_t>(i);
             AssertIntegerConversion(psblas_index, indexes[i]);
             AssertIntegerConversion(idx, i);
             vl[i]   = psblas_index;
@@ -282,16 +282,16 @@ namespace PSCToolkitWrappers
           ghost_indices.get_index_vector();
         const auto number_of_ghost_indices = ghost_indexes.size();
 
-        std::vector<psb_l_t> global_ghost_indices(number_of_ghost_indices);
-        std::vector<psb_i_t> local_ghost_indices(number_of_ghost_indices);
+        std::vector<psb_c_l_t> global_ghost_indices(number_of_ghost_indices);
+        std::vector<psb_c_i_t> local_ghost_indices(number_of_ghost_indices);
 
-        psb_i_t extended_idx_counter = number_of_local_indexes;
+        psb_c_i_t extended_idx_counter = number_of_local_indexes;
         for (std::size_t i = 0; i < number_of_ghost_indices; ++i)
           {
-            const auto psblas_index = static_cast<psb_l_t>(ghost_indexes[i]);
+            const auto psblas_index = static_cast<psb_c_l_t>(ghost_indexes[i]);
             AssertIntegerConversion(psblas_index, ghost_indexes[i]);
             global_ghost_indices[i] = psblas_index;
-            const auto idx = static_cast<psb_i_t>(extended_idx_counter);
+            const auto idx = static_cast<psb_c_i_t>(extended_idx_counter);
             AssertIntegerConversion(idx, extended_idx_counter);
             local_ghost_indices[i] = extended_idx_counter++;
           }
@@ -674,15 +674,15 @@ namespace PSCToolkitWrappers
 
     // Contributions to entries owned by another process cannot be applied
     // locally; hand them to PSBLAS, which exchanges them in compress().
-    std::vector<psb_l_t> irw;
-    std::vector<psb_d_t> val;
+    std::vector<psb_c_l_t> irw;
+    std::vector<psb_c_d_t> val;
 
     for (std::size_t i = 0; i < indices.size(); ++i)
       if (owned_elements.is_element(indices[i]))
         local_values[owned_elements.index_within_set(indices[i])] += values[i];
       else
         {
-          const auto psblas_index = static_cast<psb_l_t>(indices[i]);
+          const auto psblas_index = static_cast<psb_c_l_t>(indices[i]);
           AssertIntegerConversion(psblas_index, indices[i]);
           irw.push_back(psblas_index);
           val.push_back(values[i]);
@@ -690,7 +690,7 @@ namespace PSCToolkitWrappers
 
     if (irw.empty() == false)
       {
-        const auto nz = static_cast<psb_i_t>(irw.size());
+        const auto nz = static_cast<psb_c_i_t>(irw.size());
         AssertIntegerConversion(nz, irw.size());
 
         const int ierr = psb_c_dgeins_options(nz,
@@ -908,8 +908,8 @@ namespace PSCToolkitWrappers
         // entries and resets the remote insertion list after the previous
         // assembly. Processes that have already inserted remote entries are
         // already in update state, so their pending contributions are kept.
-        psb_l_t dummy_index = 0;
-        psb_d_t dummy_value = 0.;
+        psb_c_l_t dummy_index = 0;
+        psb_c_d_t dummy_value = 0.;
         ierr                = psb_c_dgeins_options(0,
                                     &dummy_index,
                                     &dummy_value,

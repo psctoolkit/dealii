@@ -978,7 +978,7 @@ namespace PSCToolkitWrappers
         auto input = indices_begin;
         while (input != indices_end)
           {
-            const auto index = static_cast<psb_l_t>(*input);
+            const auto index = static_cast<psb_c_l_t>(*input);
             AssertThrow(owned_elements.is_element(index) ||
                           ghost_indices.is_element(index),
                         ExcMessage(

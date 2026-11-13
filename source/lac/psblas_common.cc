@@ -37,7 +37,7 @@ namespace PSCToolkitWrappers
             MPI_Comm_dup(input_communicator, &communicator);
           AssertThrowMPI(duplicate_error);
           const MPI_Fint fortran_communicator = MPI_Comm_c2f(communicator);
-          const psb_i_t  converted = static_cast<psb_i_t>(fortran_communicator);
+          const psb_c_i_t  converted = static_cast<psb_c_i_t>(fortran_communicator);
           AssertIntegerConversion(converted, fortran_communicator);
           psb_c_init_from_fint(&owned_context, converted);
           context = &owned_context;
