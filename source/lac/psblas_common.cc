@@ -39,6 +39,12 @@ namespace PSCToolkitWrappers
           const MPI_Fint fortran_communicator = MPI_Comm_c2f(communicator);
           const psb_c_i_t  converted = static_cast<psb_c_i_t>(fortran_communicator);
           AssertIntegerConversion(converted, fortran_communicator);
+          // PSBLAS caches rank and size by the last Fortran communicator
+          // handle. MPI may reuse a released subgroup's handle for a different
+          // group. Refresh that cache with the live world context first.
+          // psb_c_info only queries rank and size; it is not collective.
+          psb_c_i_t world_rank = -1, world_size = -1;
+          psb_c_info(*context, &world_rank, &world_size);
           psb_c_init_from_fint(&owned_context, converted);
           context = &owned_context;
         }
