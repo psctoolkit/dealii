@@ -10,6 +10,10 @@
 //
 // -----------------------------------------------------------------------------
 
+// Define the solver template before the native vector's swap overload.
+#include <deal.II/lac/solver_minres.h>
+
+#include <deal.II/lac/precondition.h>
 #include <deal.II/lac/psblas_sparse_matrix.h>
 #include <deal.II/lac/psblas_vector.h>
 
@@ -72,4 +76,42 @@ main(int argc, char **argv)
     AssertThrow(std::abs(y(i) - 8.) < 1.e-12, ExcInternalError());
   if (rank == 0)
     deallog << "Original scalar assembly and native products OK" << std::endl;
+
+  // Unqualified swap must exchange native storage without copying values.
+  auto *const x_handle = x.get_psblas_vector();
+  auto *const y_handle = y.get_psblas_vector();
+  swap(x, y);
+  AssertThrow(x.get_psblas_vector() == y_handle &&
+                y.get_psblas_vector() == x_handle,
+              ExcInternalError());
+  for (const auto i : contiguous)
+    {
+      AssertThrow(std::abs(x(i) - 8.) < 1.e-12, ExcInternalError());
+      AssertThrow(std::abs(y(i) - 2.) < 1.e-12, ExcInternalError());
+    }
+
+  // MINRES rotates scalar work vectors with the same unqualified swap.
+  // Use a symmetric indefinite operator and an SPD identity preconditioner.
+  matrix.reinit(contiguous, pattern, comm);
+  for (const auto i : contiguous)
+    {
+      matrix.set(i, i, i % 2 == 0 ? 2. : -3.);
+      x(i) = i + 1.;
+    }
+  matrix.compress();
+  x.compress(VectorOperation::insert);
+
+  PSCToolkitWrappers::Vector rhs(contiguous, comm), residual(contiguous, comm);
+  matrix.vmult(rhs, x);
+  y = 0.;
+  SolverControl control(20, 1.e-12 * rhs.l2_norm(), false, false);
+  SolverMinRes<PSCToolkitWrappers::Vector> solver(control);
+  solver.solve(matrix, y, rhs, PreconditionIdentity());
+  matrix.vmult(residual, y);
+  residual -= rhs;
+  AssertThrow(residual.l2_norm() <= 1.e-12 * rhs.l2_norm(), ExcInternalError());
+  y -= x;
+  AssertThrow(y.l2_norm() <= 1.e-12 * x.l2_norm(), ExcInternalError());
+  if (rank == 0)
+    deallog << "Scalar free swap and MINRES OK" << std::endl;
 }

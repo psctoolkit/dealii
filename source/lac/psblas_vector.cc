@@ -16,6 +16,7 @@
 
 #include <deal.II/lac/psblas_vector.h>
 
+#include <algorithm>
 #include <cstdlib>
 
 #ifdef DEAL_II_WITH_PSBLAS
@@ -142,7 +143,9 @@ namespace PSCToolkitWrappers
         const auto number_of_local_indexes =
           indexes.size(); // Number of local indexes
 
-        std::vector<psb_c_l_t> vl(number_of_local_indexes);
+        // The Fortran array argument must be valid even when the count is zero.
+        std::vector<psb_c_l_t> vl(
+          std::max<std::size_t>(1, number_of_local_indexes));
         for (std::size_t i = 0; i < number_of_local_indexes; ++i)
           {
             const auto psblas_index = static_cast<psb_c_l_t>(indexes[i]);
@@ -250,8 +253,11 @@ namespace PSCToolkitWrappers
         const auto number_of_local_indexes =
           indexes.size(); // Number of local indexes
 
-        std::vector<psb_c_l_t> vl(number_of_local_indexes);
-        std::vector<psb_c_i_t> lidx(number_of_local_indexes);
+        // Keep both array arguments valid for an empty local partition.
+        std::vector<psb_c_l_t> vl(
+          std::max<std::size_t>(1, number_of_local_indexes));
+        std::vector<psb_c_i_t> lidx(
+          std::max<std::size_t>(1, number_of_local_indexes));
         for (std::size_t i = 0; i < number_of_local_indexes; ++i)
           {
             const auto psblas_index = static_cast<psb_c_l_t>(indexes[i]);
@@ -282,8 +288,10 @@ namespace PSCToolkitWrappers
           ghost_indices.get_index_vector();
         const auto number_of_ghost_indices = ghost_indexes.size();
 
-        std::vector<psb_c_l_t> global_ghost_indices(number_of_ghost_indices);
-        std::vector<psb_c_i_t> local_ghost_indices(number_of_ghost_indices);
+        std::vector<psb_c_l_t> global_ghost_indices(
+          std::max<std::size_t>(1, number_of_ghost_indices));
+        std::vector<psb_c_i_t> local_ghost_indices(
+          std::max<std::size_t>(1, number_of_ghost_indices));
 
         psb_c_i_t extended_idx_counter = number_of_local_indexes;
         for (std::size_t i = 0; i < number_of_ghost_indices; ++i)

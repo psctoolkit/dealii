@@ -18,6 +18,8 @@
 
 #include <psb_c_base.h>
 
+#include <algorithm>
+
 
 #ifdef DEAL_II_WITH_PSBLAS
 #  include <deal.II/lac/psblas_sparsity_pattern.h>
@@ -44,7 +46,7 @@ namespace PSCToolkitWrappers
 
     psb_c_i_t number_of_local_indexes = indexes.size(); // Number of local indexes
     // Copy the indexes into a psb_c_l_t vector
-    std::vector<psb_c_l_t> vl(number_of_local_indexes);
+    std::vector<psb_c_l_t> vl(std::max<std::size_t>(1, indexes.size()));
     for (psb_c_i_t i = 0; i < number_of_local_indexes; ++i)
       {
         const auto psblas_index = static_cast<psb_c_l_t>(indexes[i]);

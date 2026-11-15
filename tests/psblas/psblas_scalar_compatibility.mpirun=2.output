@@ -1,2 +1,3 @@
 
 DEAL::Original scalar assembly and native products OK
+DEAL::Scalar free swap and MINRES OK

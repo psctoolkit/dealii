@@ -26,6 +26,7 @@
 
 #include <psb_types.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <utility>
 
@@ -121,7 +122,7 @@ namespace PSCToolkitWrappers
     psb_c_i_t number_of_local_indexes = indexes.size(); // Number of local indexes
 
     // Copy the indexes into an array called vl
-    std::vector<psb_c_l_t> vl(number_of_local_indexes);
+    std::vector<psb_c_l_t> vl(std::max<std::size_t>(1, indexes.size()));
     for (psb_c_i_t i = 0; i < number_of_local_indexes; ++i)
       {
         const auto psblas_index = static_cast<psb_c_l_t>(indexes[i]);
@@ -220,7 +221,7 @@ namespace PSCToolkitWrappers
         local_rows.get_index_vector();
       const psb_c_i_t n_local = static_cast<psb_c_i_t>(indexes.size());
 
-      std::vector<psb_c_l_t> vl(n_local);
+      std::vector<psb_c_l_t> vl(std::max<std::size_t>(1, indexes.size()));
       for (psb_c_i_t i = 0; i < n_local; ++i)
         {
           const auto idx = static_cast<psb_c_l_t>(indexes[i]);

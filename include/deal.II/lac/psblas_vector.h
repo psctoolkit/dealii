@@ -844,6 +844,18 @@ namespace PSCToolkitWrappers
   };
 
 
+  /**
+   * Exchange the contents of two PSBLAS vectors by calling Vector::swap().
+   *
+   * @relatesalso PSCToolkitWrappers::Vector
+   */
+  inline void
+  swap(Vector &u, Vector &v)
+  {
+    u.swap(v);
+  }
+
+
   /* ----------------------------- Inline functions ---------------- */
 
 
