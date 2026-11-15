@@ -73,6 +73,53 @@ for (VEC : VECTOR_TYPES; deal_II_dimension : DIMENSIONS;
 
 
 
+// PSCToolkit function interpolation and same-mesh transfer.
+for (VEC : PSCTOOLKIT_VECTOR_TYPES; deal_II_dimension : DIMENSIONS;
+     deal_II_space_dimension : SPACE_DIMENSIONS)
+  {
+#if deal_II_dimension <= deal_II_space_dimension
+    namespace VectorTools
+    \{
+      template void
+      interpolate(
+        const hp::MappingCollection<deal_II_dimension, deal_II_space_dimension>
+          &,
+        const DoFHandler<deal_II_dimension, deal_II_space_dimension> &,
+        const Function<deal_II_space_dimension, VEC::value_type> &,
+        VEC &,
+        const ComponentMask &,
+        const unsigned int);
+
+      template void
+      interpolate(
+        const Mapping<deal_II_dimension, deal_II_space_dimension> &,
+        const DoFHandler<deal_II_dimension, deal_II_space_dimension> &,
+        const Function<deal_II_space_dimension, VEC::value_type> &,
+        VEC &,
+        const ComponentMask &,
+        const unsigned int);
+
+      template void
+      interpolate(
+        const DoFHandler<deal_II_dimension, deal_II_space_dimension> &,
+        const Function<deal_II_space_dimension, VEC::value_type> &,
+        VEC &,
+        const ComponentMask &,
+        const unsigned int);
+
+      template void
+      interpolate(
+        const DoFHandler<deal_II_dimension, deal_II_space_dimension> &,
+        const DoFHandler<deal_II_dimension, deal_II_space_dimension> &,
+        const FullMatrix<double> &,
+        const VEC &,
+        VEC &);
+    \}
+#endif
+  }
+
+
+
 // TODO[SP]: replace <deal_II_dimension> by <deal_II_dimension,
 // deal_II_space_dimension>
 // where applicable and move to codimension cases above also when applicable
@@ -95,6 +142,24 @@ for (VEC : VECTOR_TYPES; deal_II_dimension : DIMENSIONS;
     \}
 #endif
   }
+
+
+for (VEC : PSCTOOLKIT_VECTOR_TYPES; deal_II_dimension : DIMENSIONS)
+  {
+    namespace VectorTools
+    \{
+      template void
+      interpolate_based_on_material_id(
+        const Mapping<deal_II_dimension, deal_II_dimension> &,
+        const DoFHandler<deal_II_dimension, deal_II_dimension> &,
+        const std::map<
+          types::material_id,
+          const Function<deal_II_dimension, VEC::value_type> *> &,
+        VEC &,
+        const ComponentMask &);
+    \}
+  }
+
 
 
 for (VEC : VECTOR_TYPES; deal_II_dimension : DIMENSIONS;

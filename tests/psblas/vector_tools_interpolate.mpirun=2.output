@@ -1,0 +1,8 @@
+DEAL::2d distributed scalar interpolation OK
+DEAL::2d distributed block interpolation OK
+DEAL::2d empty-rank scalar interpolation OK
+DEAL::2d empty-rank block interpolation OK
+DEAL::3d distributed scalar interpolation OK
+DEAL::3d distributed block interpolation OK
+DEAL::3d empty-rank scalar interpolation OK
+DEAL::3d empty-rank block interpolation OK

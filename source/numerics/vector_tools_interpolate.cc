@@ -11,6 +11,9 @@
 // -----------------------------------------------------------------------------
 
 
+#include <deal.II/lac/psblas_block_vector.h>
+#include <deal.II/lac/psblas_vector.h>
+
 #include <deal.II/numerics/vector_tools_interpolate.templates.h>
 
 #include <map>

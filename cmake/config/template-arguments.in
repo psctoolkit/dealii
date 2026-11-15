@@ -290,3 +290,7 @@ PSCTOOLKIT_VECTORS := {@DEAL_II_EXPAND_PSBLAS_VECTOR@}
 
 // PSCToolkit block vector
 PSCTOOLKIT_BLOCK_VECTORS := {@DEAL_II_EXPAND_PSBLAS_BLOCK_VECTOR@}
+
+// Scalar and block PSCToolkit vectors for shared finite-element operations
+PSCTOOLKIT_VECTOR_TYPES := {@DEAL_II_EXPAND_PSBLAS_VECTOR@;
+                           @DEAL_II_EXPAND_PSBLAS_BLOCK_VECTOR@}

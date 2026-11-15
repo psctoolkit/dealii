@@ -97,8 +97,8 @@ for (VEC : VECTOR_TYPES; deal_II_dimension : DIMENSIONS)
 
 
 
-// PSCToolkit
-for (VEC : PSCTOOLKIT_VECTORS; deal_II_dimension : DIMENSIONS)
+// PSCToolkit scalar and block vectors
+for (VEC : PSCTOOLKIT_VECTOR_TYPES; deal_II_dimension : DIMENSIONS)
   {
     template void DataOut_DoFData<deal_II_dimension, deal_II_dimension>::
       add_data_vector_internal<VEC>(
